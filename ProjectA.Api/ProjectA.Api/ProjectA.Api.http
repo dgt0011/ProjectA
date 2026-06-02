@@ -1,0 +1,6 @@
+@ProjectA.Api_HostAddress = http://localhost:5031
+
+GET {{ProjectA.Api_HostAddress}}/todo
+Accept: application/json
+
+###
