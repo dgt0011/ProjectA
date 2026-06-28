@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Dapper" Version="2.1.79" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.8"/>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="ProjectA.Api\appsettings.Development.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\appsettings.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\bin\Debug\net10.0\appsettings.Development.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\bin\Debug\net10.0\appsettings.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\bin\Debug\net10.0\ProjectA.Api.deps.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\bin\Debug\net10.0\ProjectA.Api.runtimeconfig.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\bin\Debug\net10.0\ProjectA.Api.staticwebassets.endpoints.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\Debug\net10.0\rjsmrazor.dswa.cache.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\Debug\net10.0\rpswa.dswa.cache.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\Debug\net10.0\staticwebassets.build.endpoints.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\Debug\net10.0\staticwebassets.build.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\project.assets.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\project.packagespec.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\obj\ProjectA.Api.csproj.nuget.dgspec.json" />
+      <_ContentIncludedByDefault Remove="ProjectA.Api\Properties\launchSettings.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ProjectA.Api.Schema\ProjectA.Api.Schema.csproj" />
+    </ItemGroup>
+
+</Project>

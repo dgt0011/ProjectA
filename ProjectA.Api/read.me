@@ -1,0 +1,37 @@
+
+Master ConnectionString => Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=******
+  Cannot load library libgssapi_krb5.so.2 
+  Error: libgssapi_krb5.so.2: cannot open shared object file: No such file or directory
+  
+  https://jamesyip.com/2023/12/14/issue-deploy-netcore-docker-ntlm
+  
+  
+  ?? as easy as??
+  
+  sudo pacman -S libgssapi-krb5-2 - nope
+  
+  -- this is the solution for Alpine ...
+  https://pkgs.alpinelinux.org/contents?branch=edge&name=krb5-libs&arch=x86
+  includes 
+  /usr/lib/libgssapi_krb5.so.2
+ package: krb5-libs
+ 
+ "GSS Encryption Mode=Disable"
+ 
+ https://dev.to/hossien014/body-was-inferred-but-the-method-does-not-allow-inferred-body-parameterserror-1b58
+
+Body was inferred but the method does not allow inferred body parameters.
+Below is the list of parameters that we found: 
+
+Parameter           | Source                        
+---------------------------------------------------------------------------------
+service             | Body (Inferred)
+includeDone         | Query String (Inferred)
+
+
+Did you mean to register the "Body (Inferred)" parameter(s) as a Service or apply the [FromServices] or [FromBody] attribute?
+
+ 
+ 
+  
+  
