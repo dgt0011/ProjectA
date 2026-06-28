@@ -1,0 +1,31 @@
+@ProjectA.Api_HostAddress = http://localhost:5031
+
+GET {{ProjectA.Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+GET {{ProjectA.Api_HostAddress}}/ready
+Accept: application/json
+
+###
+
+GET {{ProjectA.Api_HostAddress}}/api/todo
+Accept: application/json
+
+###
+
+GET {{ProjectA.Api_HostAddress}}/api/todo?includeDone=true
+Accept: application/json
+
+###
+
+GET {{ProjectA.Api_HostAddress}}/api/todo/1
+Accept: application/json
+
+###
+
+GET {{ProjectA.Api_HostAddress}}/api/todo/999
+Accept: application/problem+json
+
+###

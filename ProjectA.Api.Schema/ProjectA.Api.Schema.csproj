@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Dapper" Version="2.1.79" />
+      <PackageReference Include="dbup-postgresql" Version="7.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Scripts\script001-CreateTable-ToDo.sql" />
+      <EmbeddedResource Include="Scripts\script001-CreateTable-ToDo.sql" />
+      <None Remove="Scripts\script002-AlterTable-ToDo-Add-columns.sql" />
+      <EmbeddedResource Include="Scripts\script002-AlterTable-ToDo-Add-columns.sql" />
+    </ItemGroup>
+
+</Project>
