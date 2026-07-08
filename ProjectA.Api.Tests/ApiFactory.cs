@@ -16,13 +16,12 @@ public sealed class ApiFactory : WebApplicationFactory<IApiMarker>, IAsyncLifeti
 {
     public HttpClient? HttpClient { get; private set; }
     
-    private readonly PostgreSqlContainer _postgresDbContainer = new PostgreSqlBuilder()
-        .WithImage("postgres:17.10-alpine")
+    private readonly PostgreSqlContainer _postgresDbContainer = new PostgreSqlBuilder("postgres:17.10-alpine")
         .WithDatabase("projectaDb")
         .WithUsername("postgres")
         .WithPassword("postgres")
         .WithPortBinding(5432, 5432)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
+        .WithWaitStrategy((DotNet.Testcontainers.Configurations.IWaitForContainerOS)Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(5432))
         .Build();
    
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -55,7 +54,6 @@ public sealed class ApiFactory : WebApplicationFactory<IApiMarker>, IAsyncLifeti
     public async Task InitializeAsync()
     {
         await _postgresDbContainer.StartAsync();
-        //HttpClient = CreateClient();
     }
 
     async Task IAsyncLifetime.DisposeAsync()
