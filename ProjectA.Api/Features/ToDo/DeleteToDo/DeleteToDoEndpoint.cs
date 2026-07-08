@@ -1,7 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using ProjectA.Api.Data;
-using ProjectA.Api.Features.ToDo;
 
 namespace ProjectA.Api.Features.ToDo.DeleteToDo;
 
@@ -21,7 +20,7 @@ public static class DeleteToDoEndpoint
         CancellationToken cancellationToken = default)
     {
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-        var deleted = await connection.DeleteAsync(new ToDoEntity { id = (long)id });
+        var deleted = await connection.DeleteAsync(new ToDoDto { id = (long)id });
 
         if (!deleted)
         {

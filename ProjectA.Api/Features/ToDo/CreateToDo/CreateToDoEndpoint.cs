@@ -25,7 +25,7 @@ public static class CreateToDoEndpoint
             return TypedResults.ValidationProblem(errors);
         }
 
-        var entity = new ToDoEntity
+        var entity = new ToDoDto
         {
             title = request.Title,
             actioned = false,

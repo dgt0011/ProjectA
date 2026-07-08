@@ -23,7 +23,8 @@
 &lt;/SessionState&gt;</s:String>
 	
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=ee3f54c6_002De1c9_002D4304_002Da4e4_002D4e0eb5c9d23c/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="GetList_WithoutIncludeDone_ReturnsOnlyOutstandingItems" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
-  &lt;TestAncestor&gt;
-    &lt;TestId&gt;xUnit::020D24B2-D0A9-45AD-9E3D-7EE04527C2D0::net10.0::ProjectA.Api.Tests.ToDo.ToDoEndpointsTests&lt;/TestId&gt;
-  &lt;/TestAncestor&gt;
+  &lt;And&gt;
+    &lt;Namespace&gt;ProjectA.Api.Tests.Features.ToDo&lt;/Namespace&gt;
+    &lt;Project Location="/home/darren/dev/ProjectA/ProjectA.Api.Tests" Presentation="&amp;lt;ProjectA.Api.Tests&amp;gt;" /&gt;
+  &lt;/And&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

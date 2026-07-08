@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ProjectA.Api.Data;
 using ProjectA.Api.Features.ToDo;
 

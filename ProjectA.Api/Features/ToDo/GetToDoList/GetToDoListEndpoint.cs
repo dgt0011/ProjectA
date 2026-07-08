@@ -2,7 +2,6 @@ using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using ProjectA.Api.Data;
-using ProjectA.Api.Features.ToDo;
 
 namespace ProjectA.Api.Features.ToDo.GetToDoList;
 
@@ -29,8 +28,8 @@ public static class GetToDoListEndpoint
             // Dapper.Contrib's GetAllAsync has no filtering support, so the includeDone
             // filter is applied in memory. Fine at this table's size; if `todos` grows large
             // enough for this to matter, that's a sign this slice should go back to a
-            // hand-written filtered query.
-            var entities = await connection.GetAllAsync<ToDoEntity>();
+            // handwritten filtered query.
+            var entities = await connection.GetAllAsync<ToDoDto>();
 
             var items = entities
                 .Where(entity => includeDone || !entity.actioned)

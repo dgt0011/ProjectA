@@ -1,7 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using ProjectA.Api.Data;
-using ProjectA.Api.Features.ToDo;
 
 namespace ProjectA.Api.Features.ToDo.GetToDoById;
 
@@ -23,7 +22,7 @@ public static class GetToDoByIdEndpoint
         try
         {
             using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-            var entity = await connection.GetAsync<ToDoEntity>((long)id);
+            var entity = await connection.GetAsync<ToDoDto>((long)id);
 
             if (entity is not null)
             {

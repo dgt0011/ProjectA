@@ -1,7 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using ProjectA.Api.Data;
-using ProjectA.Api.Features.ToDo;
 
 namespace ProjectA.Api.Features.ToDo.UpdateToDo;
 
@@ -38,7 +37,7 @@ public static class UpdateToDoEndpoint
         // Dapper.Contrib's UpdateAsync writes every non-key property back to the row, so the
         // existing entity has to be loaded first - otherwise fields the request doesn't carry
         // (like date_created) would be overwritten with their C# default values.
-        var entity = await connection.GetAsync<ToDoEntity>((long)id);
+        var entity = await connection.GetAsync<ToDoDto>((long)id);
         if (entity is null)
         {
             return notFound;
