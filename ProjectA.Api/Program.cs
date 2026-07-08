@@ -1,4 +1,9 @@
 using ProjectA.Api.Data;
+using ProjectA.Api.Features.Attachments;
+using ProjectA.Api.Features.Bookmarks;
+using ProjectA.Api.Features.Categories;
+using ProjectA.Api.Features.Notes;
+using ProjectA.Api.Features.Projects;
 using ProjectA.Api.Features.ToDo;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +59,11 @@ if (!app.Environment.IsEnvironment("Testing"))
 //    .ExcludeFromDescription();
 
 app.MapToDoEndpoints();
+app.MapCategoryEndpoints();
+app.MapBookmarkEndpoints();
+app.MapNoteEndpoints();
+app.MapAttachmentEndpoints();
+app.MapProjectEndpoints();
 
 app.Run();
 
