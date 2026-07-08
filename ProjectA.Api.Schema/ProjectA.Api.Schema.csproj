@@ -17,6 +17,8 @@
       <EmbeddedResource Include="Scripts\script001-CreateTable-ToDo.sql" />
       <None Remove="Scripts\script002-AlterTable-ToDo-Add-columns.sql" />
       <EmbeddedResource Include="Scripts\script002-AlterTable-ToDo-Add-columns.sql" />
+      <None Remove="Scripts\script003-CreateTables-Categories-bookmarks-attachments-notes-projects.sql" />
+      <EmbeddedResource Include="Scripts\script003-CreateTables-Categories-bookmarks-attachments-notes-projects.sql" />
     </ItemGroup>
 
 </Project>
