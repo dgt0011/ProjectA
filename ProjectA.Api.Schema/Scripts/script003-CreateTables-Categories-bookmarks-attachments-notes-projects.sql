@@ -42,16 +42,20 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS todos (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     title           TEXT NOT NULL,
-    actioned         BOOLEAN NOT NULL DEFAULT FALSE,
+    actioned         BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE INDEX idx_todos_category_id ON todos(category_id);
-CREATE INDEX idx_todos_project_id ON todos(project_id);
-
-ALTER TABLE todos ADD COLUMN IF NOT EXISTS category_id BIGINT NOT NULL REFERENCES categories(id);
-ALTER TABLE todos ADD COLUMN IF NOT EXISTS project_id BIGINT NOT NULL REFERENCES projects(id);
+-- category_id/project_id are nullable: no application code populates them yet (ToDo
+-- still uses the free-text `category` column from script001), so NOT NULL here would
+-- reject every future insert once this script finally parses successfully.
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS category_id BIGINT NULL REFERENCES categories(id);
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS project_id BIGINT NULL REFERENCES projects(id);
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS date_created TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS date_modified TIMESTAMPTZ NULL;
+
+-- Indexes must come after the columns they index exist.
+CREATE INDEX IF NOT EXISTS idx_todos_category_id ON todos(category_id);
+CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id);
 
 -- ---
 -- Relationship Tables

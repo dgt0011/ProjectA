@@ -1,4 +1,5 @@
 using ProjectA.Api.Data;
+using ProjectA.Api.Features.Categories;
 using ProjectA.Api.Features.ToDo;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +55,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 //    .ExcludeFromDescription();
 
 app.MapToDoEndpoints();
+app.MapCategoryEndpoints();
 
 app.Run();
 
