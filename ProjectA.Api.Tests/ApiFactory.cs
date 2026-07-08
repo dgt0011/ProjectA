@@ -48,7 +48,14 @@ public sealed class ApiFactory : WebApplicationFactory<IApiMarker>, IAsyncLifeti
         var connectString = _postgresDbContainer.GetConnectionString();
         connectString += ";GSS Encryption Mode=Disable";
 
-        Upgrader.Upgrade(connectString);
+        // Upgrader.Upgrade() returns false rather than throwing on a failed script, so this
+        // has to be checked explicitly - otherwise a broken migration fails silently and every
+        // test just runs against whatever incomplete schema was left behind.
+        if (!Upgrader.Upgrade(connectString))
+        {
+            throw new InvalidOperationException(
+                "Database migration failed - check console output from DbUp for the failing script.");
+        }
     }
     
     public async Task InitializeAsync()
