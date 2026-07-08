@@ -60,13 +60,10 @@ if (!app.Environment.IsEnvironment("Testing"))
 
 app.MapToDoEndpoints();
 app.MapCategoryEndpoints();
-<<<<<<< HEAD
 app.MapBookmarkEndpoints();
 app.MapNoteEndpoints();
 app.MapAttachmentEndpoints();
 app.MapProjectEndpoints();
-=======
->>>>>>> origin/main
 
 app.Run();
 
