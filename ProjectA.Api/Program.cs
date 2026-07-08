@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ProjectA.Api.Data;
-using ProjectA.Api.ToDo;
+using ProjectA.Api.Features.ToDo;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +24,8 @@ builder.Services.AddProblemDetails(options =>
 //   .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
 //    .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
-// builder.Services.AddProjectAData(builder.Configuration);
+builder.Services.AddSingleton<IDbConnectionFactory>(_ =>
+    new PostgresDbConnectionFactory(builder.Configuration.GetConnectionString("DefaultConnection")!));
 
 var app = builder.Build();
 
@@ -54,7 +55,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 //    })
 //    .ExcludeFromDescription();
 
-app.RegisterTodoEndpoints();
+app.MapToDoEndpoints();
 
 app.Run();
 
