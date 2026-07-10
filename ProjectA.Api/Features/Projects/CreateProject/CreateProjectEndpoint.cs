@@ -33,7 +33,15 @@ public static class CreateProjectEndpoint
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-        await connection.InsertAsync(entity);
+
+        try
+        {
+            await connection.InsertAsync(entity);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
 
         var response = new ProjectResponse(entity.id, entity.title, entity.description, entity.start_date);
 
@@ -58,8 +66,8 @@ public static class CreateProjectEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateProjectRequest(string Title, string? Description, DateOnly? StartDate);
+    public sealed record CreateProjectRequest(string Title, string? Description, DateTime? StartDate);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
-    public sealed record ProjectResponse(long Id, string Title, string? Description, DateOnly StartDate);
+    public sealed record ProjectResponse(long Id, string Title, string? Description, DateTime StartDate);
 }

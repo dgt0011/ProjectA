@@ -70,8 +70,8 @@ public static class UpdateProjectEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateProjectRequest(string Title, string? Description, DateOnly? StartDate);
+    public sealed record UpdateProjectRequest(string Title, string? Description, DateTime? StartDate);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
-    public sealed record ProjectResponse(long Id, string Title, string? Description, DateOnly StartDate);
+    public sealed record ProjectResponse(long Id, string Title, string? Description, DateTime StartDate);
 }

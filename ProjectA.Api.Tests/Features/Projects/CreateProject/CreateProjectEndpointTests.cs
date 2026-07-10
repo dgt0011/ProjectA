@@ -40,7 +40,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     public async Task Post_WithValidRequest_CreatesProjectAndReturnsCreated()
     {
         var request = new CreateProjectEndpoint.CreateProjectRequest(
-            $"{TitlePrefix} New", "A description", new DateOnly(2026, 6, 1));
+            $"{TitlePrefix} New", "A description", new DateTime(2026, 6, 1).Date);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -52,13 +52,13 @@ public class CreateProjectEndpointTests : IAsyncLifetime
         Assert.True(created.Id > 0);
         Assert.Contains($"/api/projects/{created.Id}", response.Headers.Location!.ToString());
         Assert.Equal($"{TitlePrefix} New", created.Title);
-        Assert.Equal(new DateOnly(2026, 6, 1), created.StartDate);
+        Assert.Equal(new DateTime(2026, 6, 1).Date, created.StartDate);
     }
 
     [Fact]
     public async Task Post_WithMissingTitle_ReturnsValidationProblem()
     {
-        var request = new CreateProjectEndpoint.CreateProjectRequest(" ", null, new DateOnly(2026, 6, 1));
+        var request = new CreateProjectEndpoint.CreateProjectRequest(" ", null, new DateTime(2026, 6, 1).Date);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 

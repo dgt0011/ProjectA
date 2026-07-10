@@ -16,6 +16,6 @@ internal sealed class ProjectDto
     public long id { get; init; }
     public string title { get; set; } = string.Empty;
     public string? description { get; set; }
-    public DateOnly start_date { get; set; }
+    public DateTime start_date { get; set; }
 }
 // ReSharper restore InconsistentNaming

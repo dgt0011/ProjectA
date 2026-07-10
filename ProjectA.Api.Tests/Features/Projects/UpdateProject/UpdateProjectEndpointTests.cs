@@ -50,7 +50,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     {
         var id = await SeedProjectAsync();
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Updated", "Updated description", new DateOnly(2026, 7, 4));
+            $"{TitlePrefix} Updated", "Updated description", new DateTime(2026, 7, 4).Date);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
 
@@ -60,14 +60,14 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
         Assert.NotNull(updated);
         Assert.Equal(id, updated.Id);
         Assert.Equal($"{TitlePrefix} Updated", updated.Title);
-        Assert.Equal(new DateOnly(2026, 7, 4), updated.StartDate);
+        Assert.Equal(new DateTime(2026, 7, 4).Date, updated.StartDate);
     }
 
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Missing", null, new DateOnly(2026, 1, 1));
+            $"{TitlePrefix} Missing", null, new DateTime(2026, 1, 1).Date);
 
         var response = await _client.PutAsJsonAsync("/api/projects/999999", request, JsonOptions);
 
@@ -78,7 +78,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     public async Task Put_WithMissingTitle_ReturnsValidationProblem()
     {
         var id = await SeedProjectAsync();
-        var request = new UpdateProjectEndpoint.UpdateProjectRequest(" ", null, new DateOnly(2026, 1, 1));
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(" ", null, new DateTime(2026, 1, 1).Date);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
 

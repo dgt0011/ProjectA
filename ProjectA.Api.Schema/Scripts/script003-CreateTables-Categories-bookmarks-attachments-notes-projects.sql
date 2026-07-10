@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS projects (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     title           VARCHAR(255) NOT NULL,
     description     TEXT,
-    start_date      DATE NOT NULL
+    start_date      TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS todos (
