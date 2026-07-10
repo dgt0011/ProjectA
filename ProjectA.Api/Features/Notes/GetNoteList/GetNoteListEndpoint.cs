@@ -1,0 +1,51 @@
+using Dapper.Contrib.Extensions;
+using Microsoft.AspNetCore.Http.HttpResults;
+using ProjectA.Api.Data;
+
+namespace ProjectA.Api.Features.Notes.GetNoteList;
+
+public static class GetNoteListEndpoint
+{
+    public static void MapGetNoteList(this RouteGroupBuilder group)
+    {
+        group.MapGet("", Handle)
+            .WithName("GetNoteList")
+            .WithSummary("List notes")
+            .WithDescription("Returns all notes.");
+    }
+
+    private static async Task<Ok<List<NoteListItemResponse>>> Handle(
+        IDbConnectionFactory connectionFactory,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+            var entities = await connection.GetAllAsync<NoteDto>();
+
+            var items = entities
+                .Select(entity => new NoteListItemResponse(
+                    entity.id,
+                    entity.title,
+                    entity.body,
+                    entity.date_created,
+                    entity.date_modified))
+                .ToList();
+
+            return TypedResults.Ok(items);
+        }
+        catch (Exception)
+        {
+            // TODO: Some logging is necessary
+            return TypedResults.Ok(new List<NoteListItemResponse>());
+        }
+    }
+
+    // Shape returned to callers of this endpoint - owned by this slice, not shared.
+    public sealed record NoteListItemResponse(
+        long Id,
+        string? Title,
+        string? Body,
+        DateTime DateCreated,
+        DateTime? DateModified);
+}

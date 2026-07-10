@@ -20,6 +20,10 @@ public static class DeleteToDoEndpoint
         CancellationToken cancellationToken = default)
     {
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // category_id/project_id are plain nullable FK columns on this row (not a join
+        // table like bookmark_categories), so deleting a ToDo never needs a separate cleanup
+        // step and never touches the categories or projects tables it may point at.
         var deleted = await connection.DeleteAsync(new ToDoDto { id = (long)id });
 
         if (!deleted)

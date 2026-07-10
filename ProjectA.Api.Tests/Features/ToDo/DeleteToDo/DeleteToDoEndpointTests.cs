@@ -10,6 +10,7 @@ namespace ProjectA.Api.Tests.Features.ToDo.DeleteToDo;
 public class DeleteToDoEndpointTests : IAsyncLifetime
 {
     private const string TestCategory = "Delete Test Category";
+    private const string LinkedCategoryTitle = "Delete Test Category For ToDo";
 
     private readonly HttpClient _client;
     private readonly IDbConnectionFactory _connectionFactory;
@@ -28,6 +29,7 @@ public class DeleteToDoEndpointTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         await connection.ExecuteAsync("DELETE FROM todos WHERE category = @Category;", new { Category = TestCategory });
+        await connection.ExecuteAsync("DELETE FROM categories WHERE title = @Title;", new { Title = LinkedCategoryTitle });
     }
 
     private async Task<long> SeedToDoAsync()
@@ -59,5 +61,32 @@ public class DeleteToDoEndpointTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Delete_WhenCategoryIdIsSet_SucceedsAndLeavesCategoryIntact()
+    {
+        // category_id is a plain nullable FK column on todos (not a join table). Deleting a
+        // ToDo that points at a real category should still succeed, and the category itself
+        // must survive untouched.
+        long categoryId;
+        long todoId;
+        using (var connection = await _connectionFactory.CreateConnectionAsync())
+        {
+            categoryId = await connection.QuerySingleAsync<long>(
+                "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
+                new { Title = LinkedCategoryTitle });
+
+            todoId = await connection.QuerySingleAsync<long>(
+                "INSERT INTO todos (title, actioned, category, category_id, date_created) " +
+                "VALUES ('To be deleted with category_id', false, @Category, @CategoryId, now()) RETURNING id;",
+                new { Category = TestCategory, CategoryId = categoryId });
+        }
+
+        var response = await _client.DeleteAsync($"/api/todo/{todoId}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var categoryResponse = await _client.GetAsync($"/api/categories/{categoryId}");
+        Assert.Equal(HttpStatusCode.OK, categoryResponse.StatusCode);
     }
 }
