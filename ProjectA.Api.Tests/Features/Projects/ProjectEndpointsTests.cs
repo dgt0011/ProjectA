@@ -58,8 +58,8 @@ public class ProjectEndpointsTests : IAsyncLifetime
 
         var seeded = projects.Where(p => p.Title.StartsWith(TitlePrefix)).ToList();
         Assert.Equal(2, seeded.Count);
-        Assert.Contains(seeded, p => p.Title == $"{TitlePrefix} A" && p.StartDate == new DateOnly(2026, 1, 1));
-        Assert.Contains(seeded, p => p.Title == $"{TitlePrefix} B" && p.StartDate == new DateOnly(2026, 2, 1));
+        Assert.Contains(seeded, p => p.Title == $"{TitlePrefix} A" && p.StartDate == new DateTime(2026, 1, 1).Date);
+        Assert.Contains(seeded, p => p.Title == $"{TitlePrefix} B" && p.StartDate == new DateTime(2026, 2, 1).Date);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class ProjectEndpointsTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         var id = await connection.QuerySingleAsync<long>(
-            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-03-15') RETURNING id;",
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-03-15 00:00:00+00') RETURNING id;",
             new { Title = $"{TitlePrefix} ById" });
 
         var response = await _client.GetAsync($"/api/projects/{id}");
@@ -77,7 +77,7 @@ public class ProjectEndpointsTests : IAsyncLifetime
         var project = await response.Content.ReadFromJsonAsync<GetProjectByIdEndpoint.ProjectResponse>(JsonOptions);
         Assert.NotNull(project);
         Assert.Equal(id, project.Id);
-        Assert.Equal(new DateOnly(2026, 3, 15), project.StartDate);
+        Assert.Equal(new DateTime(2026, 3, 15).Date, project.StartDate);
     }
 
     [Fact]

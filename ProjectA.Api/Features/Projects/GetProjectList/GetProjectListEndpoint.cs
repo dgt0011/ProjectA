@@ -41,5 +41,5 @@ public static class GetProjectListEndpoint
     }
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
-    public sealed record ProjectListItemResponse(long Id, string Title, string? Description, DateOnly StartDate);
+    public sealed record ProjectListItemResponse(long Id, string Title, string? Description, DateTime StartDate);
 }
