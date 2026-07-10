@@ -1,3 +1,4 @@
+using Dapper;
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using ProjectA.Api.Data;
@@ -11,7 +12,7 @@ public static class GetBookmarkListEndpoint
         group.MapGet("", Handle)
             .WithName("GetBookmarkList")
             .WithSummary("List bookmarks")
-            .WithDescription("Returns all bookmarks.");
+            .WithDescription("Returns all bookmarks, including each one's associated category Ids.");
     }
 
     private static async Task<Ok<List<BookmarkListItemResponse>>> Handle(
@@ -23,6 +24,18 @@ public static class GetBookmarkListEndpoint
             using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
             var entities = await connection.GetAllAsync<BookmarkDto>();
 
+            // One bulk query for every bookmark_categories row rather than one lookup per
+            // bookmark (which is what BookmarkCategoryLinks.GetCategoryIdsAsync would mean
+            // here) - avoids an N+1 as the bookmark list grows.
+            var links = await connection.QueryAsync<BookmarkCategoryLink>(
+                "SELECT bookmark_id, category_id FROM bookmark_categories;");
+
+            var categoryIdsByBookmark = links
+                .GroupBy(link => link.bookmark_id)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyCollection<long>)group.Select(link => link.category_id).Order().ToList());
+
             var items = entities
                 .Select(entity => new BookmarkListItemResponse(
                     entity.id,
@@ -31,7 +44,8 @@ public static class GetBookmarkListEndpoint
                     entity.description,
                     entity.rating,
                     entity.date_created,
-                    entity.date_modified))
+                    entity.date_modified,
+                    categoryIdsByBookmark.GetValueOrDefault(entity.id, Array.Empty<long>())))
                 .ToList();
 
             return TypedResults.Ok(items);
@@ -43,6 +57,10 @@ public static class GetBookmarkListEndpoint
         }
     }
 
+    // Row shape for the bulk bookmark_categories query above - private to this slice.
+    // ReSharper disable once NotAccessedPositionalProperty.Local
+    private sealed record BookmarkCategoryLink(long bookmark_id, long category_id);
+
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record BookmarkListItemResponse(
         long Id,
@@ -51,5 +69,6 @@ public static class GetBookmarkListEndpoint
         string? Description,
         int Rating,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> CategoryIds);
 }

@@ -14,6 +14,7 @@ namespace ProjectA.Api.Tests.Features.Bookmarks;
 public class BookmarkEndpointsTests : IAsyncLifetime
 {
     private const string TitlePrefix = "List Test Bookmark";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
@@ -32,8 +33,17 @@ public class BookmarkEndpointsTests : IAsyncLifetime
     private async Task CleanUpAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        await connection.ExecuteAsync(
+            "DELETE FROM bookmark_categories WHERE " +
+            "bookmark_id IN (SELECT id FROM bookmarks WHERE title LIKE @Pattern) OR " +
+            "category_id IN (SELECT id FROM categories WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync(
             "DELETE FROM bookmarks WHERE title LIKE @Pattern;",
+            new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM categories WHERE title LIKE @Pattern;",
             new { Pattern = $"{TitlePrefix}%" });
     }
 
@@ -61,6 +71,31 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         Assert.Equal(2, seeded.Count);
         Assert.Contains(seeded, b => b.Title == $"{TitlePrefix} A" && b.Rating == 5);
         Assert.Contains(seeded, b => b.Title == $"{TitlePrefix} B" && b.Rating == 1);
+        Assert.All(seeded, b => Assert.Empty(b.CategoryIds));
+    }
+
+    [Fact]
+    public async Task GetList_IncludesCategoryAssociations()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var bookmarkId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title) VALUES ('https://example.com/list-categorized', @Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListCategorized" });
+        var categoryId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListCategory" });
+        await connection.ExecuteAsync(
+            "INSERT INTO bookmark_categories (bookmark_id, category_id) VALUES (@BookmarkId, @CategoryId);",
+            new { BookmarkId = bookmarkId, CategoryId = categoryId });
+
+        var response = await _client.GetAsync("/api/bookmarks");
+        var bookmarks = await response.Content
+            .ReadFromJsonAsync<List<GetBookmarkListEndpoint.BookmarkListItemResponse>>(JsonOptions);
+        Assert.NotNull(bookmarks);
+
+        var found = bookmarks.Single(b => b.Id == bookmarkId);
+        Assert.Equal([categoryId], found.CategoryIds);
     }
 
     [Fact]
@@ -81,6 +116,29 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         Assert.Equal(id, bookmark.Id);
         Assert.Equal("https://example.com/byid", bookmark.Url);
         Assert.Equal(7, bookmark.Rating);
+        Assert.Empty(bookmark.CategoryIds);
+    }
+
+    [Fact]
+    public async Task GetById_IncludesCategoryAssociations()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var bookmarkId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title) VALUES ('https://example.com/byid-categorized', @Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdCategorized" });
+        var categoryId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdCategory" });
+        await connection.ExecuteAsync(
+            "INSERT INTO bookmark_categories (bookmark_id, category_id) VALUES (@BookmarkId, @CategoryId);",
+            new { BookmarkId = bookmarkId, CategoryId = categoryId });
+
+        var response = await _client.GetAsync($"/api/bookmarks/{bookmarkId}");
+        var bookmark = await response.Content
+            .ReadFromJsonAsync<GetBookmarkByIdEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(bookmark);
+        Assert.Equal([categoryId], bookmark.CategoryIds);
     }
 
     [Fact]

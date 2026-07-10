@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.Bookmarks.UpdateBookmark;
@@ -11,7 +12,10 @@ public static class UpdateBookmarkEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateBookmark")
             .WithSummary("Update a bookmark")
-            .WithDescription("Replaces an existing bookmark's url, title, description and rating.");
+            .WithDescription(
+                "Replaces an existing bookmark's url, title, description and rating. " +
+                "If CategoryIds is supplied it replaces the bookmark's category associations " +
+                "(pass an empty array to clear them); omit CategoryIds entirely to leave them unchanged.");
     }
 
     private static async Task<Results<Ok<BookmarkResponse>, ValidationProblem, ProblemHttpResult>> Handle(
@@ -33,12 +37,14 @@ public static class UpdateBookmarkEndpoint
             type: "https://tools.ietf.org/html/rfc7231#section-6.5.4");
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
 
         // date_created has to be preserved, so the existing row is loaded first rather than
         // building the entity from the request alone (same reasoning as UpdateToDoEndpoint).
-        var entity = await connection.GetAsync<BookmarkDto>((long)id);
+        var entity = await connection.GetAsync<BookmarkDto>((long)id, transaction);
         if (entity is null)
         {
+            transaction.Rollback();
             return notFound;
         }
 
@@ -48,10 +54,32 @@ public static class UpdateBookmarkEndpoint
         entity.rating = (short)(request.Rating ?? entity.rating);
         entity.date_modified = DateTime.UtcNow;
 
-        var updated = await connection.UpdateAsync(entity);
-        if (!updated)
+        List<long> categoryIds;
+        try
         {
-            return notFound;
+            var updated = await connection.UpdateAsync(entity, transaction);
+            if (!updated)
+            {
+                transaction.Rollback();
+                return notFound;
+            }
+
+            // Null CategoryIds means "don't touch the associations" (same null-means-unchanged
+            // convention as Rating above); an explicit list, even empty, replaces them.
+            categoryIds = request.CategoryIds is not null
+                ? await BookmarkCategoryLinks.ReplaceAsync(connection, transaction, entity.id, request.CategoryIds, cancellationToken)
+                : await BookmarkCategoryLinks.GetCategoryIdsAsync(connection, entity.id, cancellationToken, transaction);
+
+            transaction.Commit();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryIds)] = ["One or more CategoryIds do not refer to an existing category."]
+            });
         }
 
         var response = new BookmarkResponse(
@@ -61,7 +89,8 @@ public static class UpdateBookmarkEndpoint
             entity.description,
             entity.rating,
             entity.date_created,
-            entity.date_modified);
+            entity.date_modified,
+            categoryIds);
 
         return TypedResults.Ok(response);
     }
@@ -84,7 +113,12 @@ public static class UpdateBookmarkEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateBookmarkRequest(string Url, string? Title, string? Description, int? Rating);
+    public sealed record UpdateBookmarkRequest(
+        string Url,
+        string? Title,
+        string? Description,
+        int? Rating,
+        IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record BookmarkResponse(
@@ -94,5 +128,6 @@ public static class UpdateBookmarkEndpoint
         string? Description,
         int Rating,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> CategoryIds);
 }

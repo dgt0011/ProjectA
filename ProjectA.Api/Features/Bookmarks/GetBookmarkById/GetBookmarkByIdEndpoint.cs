@@ -11,7 +11,7 @@ public static class GetBookmarkByIdEndpoint
         group.MapGet("{id}", Handle)
             .WithName("GetBookmarkById")
             .WithSummary("Get a bookmark by Id")
-            .WithDescription("Returns a single bookmark by Id.");
+            .WithDescription("Returns a single bookmark by Id, including its associated category Ids.");
     }
 
     private static async Task<Results<Ok<BookmarkResponse>, ProblemHttpResult>> Handle(
@@ -26,6 +26,8 @@ public static class GetBookmarkByIdEndpoint
 
             if (entity is not null)
             {
+                var categoryIds = await BookmarkCategoryLinks.GetCategoryIdsAsync(connection, entity.id, cancellationToken);
+
                 var response = new BookmarkResponse(
                     entity.id,
                     entity.url,
@@ -33,7 +35,8 @@ public static class GetBookmarkByIdEndpoint
                     entity.description,
                     entity.rating,
                     entity.date_created,
-                    entity.date_modified);
+                    entity.date_modified,
+                    categoryIds);
 
                 return TypedResults.Ok(response);
             }
@@ -58,5 +61,6 @@ public static class GetBookmarkByIdEndpoint
         string? Description,
         int Rating,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> CategoryIds);
 }

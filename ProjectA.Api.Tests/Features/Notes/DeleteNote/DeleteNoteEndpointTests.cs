@@ -29,14 +29,20 @@ public class DeleteNoteEndpointTests : IAsyncLifetime
         using var connection = await _connectionFactory.CreateConnectionAsync();
 
         // Delete the join rows first - otherwise the FK constraint this cleanup exists to
-        // work around would stop the note/project rows themselves being removed.
+        // work around would stop the note/project/category rows themselves being removed.
         await connection.ExecuteAsync(
             "DELETE FROM project_notes WHERE " +
             "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern) OR " +
             "project_id IN (SELECT id FROM projects WHERE title LIKE @Pattern);",
             new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM note_categories WHERE " +
+            "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern) OR " +
+            "category_id IN (SELECT id FROM categories WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM projects WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM notes WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync("DELETE FROM categories WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
     }
 
     private async Task<long> SeedNoteAsync(string suffix)
@@ -89,5 +95,38 @@ public class DeleteNoteEndpointTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Delete_WhenHasCategoryAssociation_SucceedsAndLeavesCategoryIntact()
+    {
+        var noteId = await SeedNoteAsync("Categorized");
+
+        long categoryId;
+        using (var connection = await _connectionFactory.CreateConnectionAsync())
+        {
+            categoryId = await connection.QuerySingleAsync<long>(
+                "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
+                new { Title = $"{TitlePrefix} Category" });
+
+            await connection.ExecuteAsync(
+                "INSERT INTO note_categories (note_id, category_id) VALUES (@NoteId, @CategoryId);",
+                new { NoteId = noteId, CategoryId = categoryId });
+        }
+
+        // The category association must not block deletion...
+        var response = await _client.DeleteAsync($"/api/notes/{noteId}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        // ...and the category itself must survive, untouched.
+        var categoryResponse = await _client.GetAsync($"/api/categories/{categoryId}");
+        Assert.Equal(HttpStatusCode.OK, categoryResponse.StatusCode);
+
+        // The join row should be gone too, not left dangling.
+        using var verifyConnection = await _connectionFactory.CreateConnectionAsync();
+        var remainingLinks = await verifyConnection.QuerySingleAsync<long>(
+            "SELECT COUNT(*) FROM note_categories WHERE note_id = @NoteId;",
+            new { NoteId = noteId });
+        Assert.Equal(0, remainingLinks);
     }
 }

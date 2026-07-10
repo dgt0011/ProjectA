@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.Bookmarks.CreateBookmark;
@@ -11,7 +12,7 @@ public static class CreateBookmarkEndpoint
         group.MapPost("", Handle)
             .WithName("CreateBookmark")
             .WithSummary("Create a bookmark")
-            .WithDescription("Creates a new bookmark.");
+            .WithDescription("Creates a new bookmark, optionally associating it with one or more categories.");
     }
 
     private static async Task<Results<CreatedAtRoute<BookmarkResponse>, ValidationProblem>> Handle(
@@ -35,7 +36,29 @@ public static class CreateBookmarkEndpoint
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-        await connection.InsertAsync(entity);
+        using var transaction = connection.BeginTransaction();
+
+        List<long> categoryIds;
+        try
+        {
+            await connection.InsertAsync(entity, transaction);
+
+            // Same transaction as the insert above: if any CategoryId doesn't exist, the
+            // whole create is rolled back rather than leaving an uncategorized bookmark behind.
+            categoryIds = await BookmarkCategoryLinks.ReplaceAsync(
+                connection, transaction, entity.id, request.CategoryIds, cancellationToken);
+
+            transaction.Commit();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryIds)] = ["One or more CategoryIds do not refer to an existing category."]
+            });
+        }
 
         var response = new BookmarkResponse(
             entity.id,
@@ -44,7 +67,8 @@ public static class CreateBookmarkEndpoint
             entity.description,
             entity.rating,
             entity.date_created,
-            entity.date_modified);
+            entity.date_modified,
+            categoryIds);
 
         return TypedResults.CreatedAtRoute(response, "GetBookmarkById", new { id = response.Id });
     }
@@ -67,7 +91,12 @@ public static class CreateBookmarkEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateBookmarkRequest(string Url, string? Title, string? Description, int? Rating);
+    public sealed record CreateBookmarkRequest(
+        string Url,
+        string? Title,
+        string? Description,
+        int? Rating,
+        IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record BookmarkResponse(
@@ -77,5 +106,6 @@ public static class CreateBookmarkEndpoint
         string? Description,
         int Rating,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> CategoryIds);
 }

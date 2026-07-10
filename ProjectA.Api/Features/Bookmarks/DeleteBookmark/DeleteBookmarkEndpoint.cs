@@ -12,7 +12,9 @@ public static class DeleteBookmarkEndpoint
         group.MapDelete("{id}", Handle)
             .WithName("DeleteBookmark")
             .WithSummary("Delete a bookmark")
-            .WithDescription("Permanently removes a bookmark by Id.");
+            .WithDescription(
+                "Permanently removes a bookmark by Id. Any category associations for this " +
+                "bookmark are removed too, but the categories themselves are never touched.");
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(
@@ -21,15 +23,25 @@ public static class DeleteBookmarkEndpoint
         CancellationToken cancellationToken = default)
     {
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
 
         bool deleted;
         try
         {
-            deleted = await connection.DeleteAsync(new BookmarkDto { id = (long)id });
+            // A bookmark's Category associations should never block, or be affected by,
+            // deleting the bookmark - only this bookmark's bookmark_categories rows are
+            // cleared here (via a "replace with nothing"); the categories themselves are
+            // never touched.
+            await BookmarkCategoryLinks.ReplaceAsync(connection, transaction, (long)id, categoryIds: null, cancellationToken);
+
+            deleted = await connection.DeleteAsync(new BookmarkDto { id = (long)id }, transaction);
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
         {
-            // bookmark_categories, note_bookmarks and project_bookmarks reference bookmarks(id).
+            transaction.Rollback();
+
+            // note_bookmarks and project_bookmarks can still legitimately block deletion -
+            // only the category relationship is exempted above.
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Bookmark is in use",
@@ -39,6 +51,8 @@ public static class DeleteBookmarkEndpoint
 
         if (!deleted)
         {
+            transaction.Rollback();
+
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Bookmark not found",
@@ -46,6 +60,7 @@ public static class DeleteBookmarkEndpoint
                 type: "https://tools.ietf.org/html/rfc7231#section-6.5.4");
         }
 
+        transaction.Commit();
         return TypedResults.NoContent();
     }
 }
