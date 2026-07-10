@@ -1,0 +1,53 @@
+@page "{id:long}"
+@model ProjectA.Web.Pages.Bookmarks.EditModel
+@{
+    ViewData["Title"] = "Edit bookmark";
+}
+
+<h1>Edit bookmark</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" class="col-md-6">
+    <div class="mb-3">
+        <label asp-for="Form.Url" class="form-label"></label>
+        <input asp-for="Form.Url" class="form-control" />
+        <span asp-validation-for="Form.Url" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Title" class="form-label"></label>
+        <input asp-for="Form.Title" class="form-control" />
+        <span asp-validation-for="Form.Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Description" class="form-label"></label>
+        <textarea asp-for="Form.Description" class="form-control"></textarea>
+        <span asp-validation-for="Form.Description" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Rating" class="form-label"></label>
+        <input asp-for="Form.Rating" class="form-control" type="number" min="1" max="10" />
+        <span asp-validation-for="Form.Rating" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Categories</label>
+        @if (Model.AvailableCategories.Count == 0)
+        {
+            <p class="text-muted">No categories exist yet.</p>
+        }
+        else
+        {
+            @foreach (var category in Model.AvailableCategories)
+            {
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="Form.CategoryIds" value="@category.Id"
+                           id="category-@category.Id" @(Model.Form.CategoryIds.Contains(category.Id) ? "checked" : "") />
+                    <label class="form-check-label" for="category-@category.Id">@category.Title</label>
+                </div>
+            }
+        }
+        <span asp-validation-for="Form.CategoryIds" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-page="Index" class="btn btn-link">Cancel</a>
+</form>

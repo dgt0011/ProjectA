@@ -1,0 +1,35 @@
+@page
+@model ProjectA.Web.Pages.ToDo.CreateModel
+@{
+    ViewData["Title"] = "Create ToDo";
+}
+
+<h1>Create ToDo</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" class="col-md-6">
+    <div class="mb-3">
+        <label asp-for="Form.Title" class="form-label"></label>
+        <input asp-for="Form.Title" class="form-control" />
+        <span asp-validation-for="Form.Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Category" class="form-label"></label>
+        <input asp-for="Form.Category" class="form-control" list="category-suggestions" />
+        <datalist id="category-suggestions">
+            @foreach (var category in Model.CategorySuggestions)
+            {
+                <option value="@category"></option>
+            }
+        </datalist>
+        <span asp-validation-for="Form.Category" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Description" class="form-label"></label>
+        <textarea asp-for="Form.Description" class="form-control"></textarea>
+        <span asp-validation-for="Form.Description" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-page="Index" class="btn btn-link">Cancel</a>
+</form>

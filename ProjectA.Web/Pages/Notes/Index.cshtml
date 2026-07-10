@@ -1,0 +1,49 @@
+@page
+@model ProjectA.Web.Pages.Notes.IndexModel
+@{
+    ViewData["Title"] = "Notes";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Notes</h1>
+    <a asp-page="Create" class="btn btn-primary">Create note</a>
+</div>
+
+@if (!Model.LoadedSuccessfully)
+{
+    <div class="alert alert-warning">Could not load notes from the API.</div>
+}
+else if (Model.Notes.Count == 0)
+{
+    <p class="text-muted">No notes yet.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Body preview</th>
+                <th>Last modified</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var note in Model.Notes)
+            {
+                <tr>
+                    <td>@note.Title</td>
+                    <td class="text-muted">@Model.Excerpt(note.Body)</td>
+                    <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
+                    <td class="text-end">
+                        <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
+                              onsubmit="return confirm('Delete this note?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
