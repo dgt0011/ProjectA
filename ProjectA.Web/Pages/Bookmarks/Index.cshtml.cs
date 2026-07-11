@@ -40,6 +40,15 @@ public class IndexModel(IBookmarksApiClient bookmarksApiClient, ICategoriesApiCl
 
     public async Task<IActionResult> OnPostDeleteAsync(long id, CancellationToken cancellationToken)
     {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            // Index/list stays anonymous, but deleting is a write - this page mixes a
+            // public GET handler with this protected POST handler, so unlike Create/Edit
+            // (which are [Authorize] at the whole PageModel) this checks per-handler and
+            // sends anonymous callers to the login page instead.
+            return Challenge();
+        }
+
         var result = await bookmarksApiClient.DeleteAsync(id, cancellationToken);
         TempData[result.IsSuccess ? "SuccessMessage" : "ErrorMessage"] = result.IsSuccess
             ? "Bookmark deleted."

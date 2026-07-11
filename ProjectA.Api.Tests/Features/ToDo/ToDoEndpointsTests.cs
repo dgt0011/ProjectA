@@ -20,7 +20,7 @@ public class ToDoEndpointsTests
 
     public ToDoEndpointsTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
 
         var connectionFactory = factory.Services.GetService<IDbConnectionFactory>();
         if (connectionFactory != null)

@@ -12,7 +12,8 @@ public static class DeleteProjectEndpoint
         group.MapDelete("{id}", Handle)
             .WithName("DeleteProject")
             .WithSummary("Delete a project")
-            .WithDescription("Permanently removes a project by Id.");
+            .WithDescription("Permanently removes a project by Id.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(

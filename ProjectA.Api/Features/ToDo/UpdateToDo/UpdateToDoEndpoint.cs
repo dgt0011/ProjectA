@@ -11,7 +11,8 @@ public static class UpdateToDoEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateToDo")
             .WithSummary("Update a ToDo")
-            .WithDescription("Replaces an existing ToDo's title, category, description and completion state.");
+            .WithDescription("Replaces an existing ToDo's title, category, description and completion state.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<ToDoResponse>, ValidationProblem, ProblemHttpResult>> Handle(

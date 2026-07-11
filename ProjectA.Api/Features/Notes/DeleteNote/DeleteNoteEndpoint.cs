@@ -15,7 +15,8 @@ public static class DeleteNoteEndpoint
             .WithSummary("Delete a note")
             .WithDescription(
                 "Permanently removes a note by Id. Any category associations for this note " +
-                "are removed too, but the categories themselves are never touched.");
+                "are removed too, but the categories themselves are never touched.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(

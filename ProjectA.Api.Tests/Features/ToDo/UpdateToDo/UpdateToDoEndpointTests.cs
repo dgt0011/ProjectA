@@ -20,7 +20,7 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
 
     public UpdateToDoEndpointTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 

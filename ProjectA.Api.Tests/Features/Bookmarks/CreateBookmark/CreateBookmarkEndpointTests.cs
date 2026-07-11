@@ -21,7 +21,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
 
     public CreateBookmarkEndpointTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 

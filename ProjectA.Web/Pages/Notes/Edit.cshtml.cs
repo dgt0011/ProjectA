@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using ProjectA.Web.Common;
@@ -6,6 +7,7 @@ using ProjectA.Web.Services;
 
 namespace ProjectA.Web.Pages.Notes;
 
+[Authorize]
 public class EditModel(INotesApiClient notesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]

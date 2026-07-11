@@ -20,7 +20,7 @@ public class UpdateCategoryEndpointTests : IAsyncLifetime
 
     public UpdateCategoryEndpointTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 

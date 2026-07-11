@@ -12,7 +12,8 @@ public static class DeleteCategoryEndpoint
         group.MapDelete("{id}", Handle)
             .WithName("DeleteCategory")
             .WithSummary("Delete a category")
-            .WithDescription("Permanently removes a category by Id.");
+            .WithDescription("Permanently removes a category by Id.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(

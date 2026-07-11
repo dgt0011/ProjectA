@@ -1,0 +1,24 @@
+@page
+@model ProjectA.Web.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Log in";
+}
+
+<h1>Log in</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" class="col-md-4">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <div class="mb-3">
+        <label asp-for="Form.Username" class="form-label"></label>
+        <input asp-for="Form.Username" class="form-control" autocomplete="username" autofocus />
+        <span asp-validation-for="Form.Username" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Password" class="form-label"></label>
+        <input asp-for="Form.Password" class="form-control" autocomplete="current-password" />
+        <span asp-validation-for="Form.Password" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Log in</button>
+</form>

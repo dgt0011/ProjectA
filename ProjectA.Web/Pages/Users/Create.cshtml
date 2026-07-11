@@ -1,0 +1,24 @@
+@page
+@model ProjectA.Web.Pages.Users.CreateModel
+@{
+    ViewData["Title"] = "Create user";
+}
+
+<h1>Create user</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" class="col-md-4">
+    <div class="mb-3">
+        <label asp-for="Form.Username" class="form-label"></label>
+        <input asp-for="Form.Username" class="form-control" autocomplete="off" />
+        <span asp-validation-for="Form.Username" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Password" class="form-label"></label>
+        <input asp-for="Form.Password" class="form-control" autocomplete="new-password" />
+        <span asp-validation-for="Form.Password" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-page="Index" class="btn btn-link">Cancel</a>
+</form>

@@ -11,7 +11,8 @@ public static class UpdateNoteEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateNote")
             .WithSummary("Update a note")
-            .WithDescription("Replaces an existing note's title and body.");
+            .WithDescription("Replaces an existing note's title and body.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<NoteResponse>, ValidationProblem, ProblemHttpResult>> Handle(

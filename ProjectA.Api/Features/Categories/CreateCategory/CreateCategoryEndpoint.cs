@@ -11,7 +11,8 @@ public static class CreateCategoryEndpoint
         group.MapPost("", Handle)
             .WithName("CreateCategory")
             .WithSummary("Create a category")
-            .WithDescription("Creates a new category.");
+            .WithDescription("Creates a new category.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<CategoryResponse>, ValidationProblem>> Handle(

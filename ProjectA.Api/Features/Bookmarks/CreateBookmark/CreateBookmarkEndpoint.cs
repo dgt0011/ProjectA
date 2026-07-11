@@ -12,7 +12,8 @@ public static class CreateBookmarkEndpoint
         group.MapPost("", Handle)
             .WithName("CreateBookmark")
             .WithSummary("Create a bookmark")
-            .WithDescription("Creates a new bookmark, optionally associating it with one or more categories.");
+            .WithDescription("Creates a new bookmark, optionally associating it with one or more categories.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<BookmarkResponse>, ValidationProblem>> Handle(

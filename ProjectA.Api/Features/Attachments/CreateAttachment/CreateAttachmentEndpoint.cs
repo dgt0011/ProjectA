@@ -11,7 +11,8 @@ public static class CreateAttachmentEndpoint
         group.MapPost("", Handle)
             .WithName("CreateAttachment")
             .WithSummary("Create an attachment")
-            .WithDescription("Creates a new attachment record pointing at an S3 object.");
+            .WithDescription("Creates a new attachment record pointing at an S3 object.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<AttachmentResponse>, ValidationProblem>> Handle(

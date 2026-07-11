@@ -11,7 +11,8 @@ public static class CreateNoteEndpoint
         group.MapPost("", Handle)
             .WithName("CreateNote")
             .WithSummary("Create a note")
-            .WithDescription("Creates a new note.");
+            .WithDescription("Creates a new note.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<NoteResponse>, ValidationProblem>> Handle(

@@ -11,7 +11,8 @@ public static class CreateToDoEndpoint
         group.MapPost("", Handle)
             .WithName("CreateToDo")
             .WithSummary("Create a ToDo")
-            .WithDescription("Creates a new outstanding ToDo item.");
+            .WithDescription("Creates a new outstanding ToDo item.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<ToDoResponse>, ValidationProblem>> Handle(

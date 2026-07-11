@@ -11,7 +11,8 @@ public static class CreateProjectEndpoint
         group.MapPost("", Handle)
             .WithName("CreateProject")
             .WithSummary("Create a project")
-            .WithDescription("Creates a new project.");
+            .WithDescription("Creates a new project.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<ProjectResponse>, ValidationProblem>> Handle(
