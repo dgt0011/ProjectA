@@ -15,8 +15,8 @@ public static class UpdateBookmarkEndpoint
             .WithDescription(
                 "Replaces an existing bookmark's url, title, description and rating. " +
                 "If CategoryIds is supplied it replaces the bookmark's category associations " +
-                "(pass an empty array to clear them)
-            .RequireAuthorization(); omit CategoryIds entirely to leave them unchanged.");
+                "(pass an empty array to clear them).  omit CategoryIds entirely to leave them unchanged.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<BookmarkResponse>, ValidationProblem, ProblemHttpResult>> Handle(

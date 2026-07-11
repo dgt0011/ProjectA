@@ -5,10 +5,12 @@ namespace ProjectA.Web.Common;
 // (400, uses Errors). Not every endpoint populates every field.
 public sealed class ProblemDetailsPayload
 {
-    public string? Type { get; set; }
-    public string? Title { get; set; }
-    public int? Status { get; set; }
-    public string? Detail { get; set; }
-    public string? Instance { get; set; }
-    public Dictionary<string, string[]>? Errors { get; set; }
+    public string? Type { get; init; }
+    public string? Title { get; init; }
+    
+    public int? Status { get; init; }
+    public string? Detail { get; init; }
+    
+    public string? Instance { get; init; }
+    public Dictionary<string, string[]>? Errors { get; init; }
 }
