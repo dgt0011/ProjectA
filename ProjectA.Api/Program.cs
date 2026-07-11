@@ -39,20 +39,25 @@ builder.Services.AddSingleton<IDbConnectionFactory>(_ =>
 
 // Auth: JwtTokenService (used by the login endpoint to mint tokens) and the JwtBearer handler
 // (used by [RequireAuthorization] on Create/Update/Delete endpoints to validate them) read the
-// same three Jwt:* settings - see JwtTokenService for why they aren't wired through it here too.
+// same three Jwt:* settings. Those reads happen INSIDE the AddJwtBearer configure callback below,
+// not as local variables up here, because this callback only actually runs the first time the
+// scheme handles a request - well after builder.Build(). WebApplicationFactory-based tests inject
+// their config overrides (a test-only signing key) exactly at Build(), so reading eagerly here
+// would capture appsettings.json's placeholder value into the closure instead, permanently out of
+// sync with what JwtTokenService (a DI singleton, constructed after Build()) actually signs with.
 builder.Services.AddSingleton<JwtTokenService>();
-
-var jwtIssuer = builder.Configuration["Jwt:Issuer"]
-    ?? throw new InvalidOperationException("Jwt:Issuer is not configured.");
-var jwtAudience = builder.Configuration["Jwt:Audience"]
-    ?? throw new InvalidOperationException("Jwt:Audience is not configured.");
-var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
-    ?? throw new InvalidOperationException("Jwt:SigningKey is not configured.");
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+            ?? throw new InvalidOperationException("Jwt:Issuer is not configured.");
+        var jwtAudience = builder.Configuration["Jwt:Audience"]
+            ?? throw new InvalidOperationException("Jwt:Audience is not configured.");
+        var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
+            ?? throw new InvalidOperationException("Jwt:SigningKey is not configured.");
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
