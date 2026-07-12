@@ -6,7 +6,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>ToDo items</h1>
-    <a asp-page="Create" class="btn btn-primary">Create ToDo</a>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-page="Create" class="btn btn-primary">Create ToDo</a>
+    }
 </div>
 
 <div class="form-check mb-3">
@@ -44,11 +47,14 @@ else
                     <td><span class="badge bg-secondary">@item.Category</span></td>
                     <td>@item.Description</td>
                     <td class="text-end">
-                        <a asp-page="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                        <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id" class="d-inline"
-                              onsubmit="return confirm('Delete this ToDo item?');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                        </form>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <a asp-page="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id" class="d-inline"
+                                  onsubmit="return confirm('Delete this ToDo item?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }

@@ -6,7 +6,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>Notes</h1>
-    <a asp-page="Create" class="btn btn-primary">Create note</a>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-page="Create" class="btn btn-primary">Create note</a>
+    }
 </div>
 
 @if (!Model.LoadedSuccessfully)
@@ -36,11 +39,14 @@ else
                     <td class="text-muted">@Model.Excerpt(note.Body)</td>
                     <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
                     <td class="text-end">
-                        <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                        <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
-                              onsubmit="return confirm('Delete this note?');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                        </form>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
+                                  onsubmit="return confirm('Delete this note?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }

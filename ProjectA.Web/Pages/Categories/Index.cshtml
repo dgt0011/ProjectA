@@ -6,7 +6,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>Categories</h1>
-    <a asp-page="Create" class="btn btn-primary">Create category</a>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-page="Create" class="btn btn-primary">Create category</a>
+    }
 </div>
 
 @if (!Model.LoadedSuccessfully)
@@ -34,11 +37,14 @@ else
                     <td>@category.Title</td>
                     <td>@category.Description</td>
                     <td class="text-end">
-                        <a asp-page="Edit" asp-route-id="@category.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                        <form method="post" asp-page-handler="Delete" asp-route-id="@category.Id" class="d-inline"
-                              onsubmit="return confirm('Delete this category?');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                        </form>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <a asp-page="Edit" asp-route-id="@category.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@category.Id" class="d-inline"
+                                  onsubmit="return confirm('Delete this category?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }
