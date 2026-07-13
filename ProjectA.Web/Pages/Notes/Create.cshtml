@@ -15,6 +15,11 @@
         <span asp-validation-for="Form.Title" class="text-danger"></span>
     </div>
     <div class="mb-3">
+        <label asp-for="Form.Description" class="form-label"></label>
+        <input asp-for="Form.Description" class="form-control" placeholder="A short summary shown in the notes list" />
+        <span asp-validation-for="Form.Description" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
         <label asp-for="Form.Body" class="form-label"></label>
         <textarea asp-for="Form.Body" class="form-control" rows="12"></textarea>
         <span asp-validation-for="Form.Body" class="text-danger"></span>

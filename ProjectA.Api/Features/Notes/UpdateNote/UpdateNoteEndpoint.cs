@@ -42,6 +42,7 @@ public static class UpdateNoteEndpoint
         }
 
         entity.title = request.Title;
+        entity.description = request.Description;
         entity.body = request.Body;
         entity.date_modified = DateTime.UtcNow;
 
@@ -51,7 +52,8 @@ public static class UpdateNoteEndpoint
             return notFound;
         }
 
-        var response = new NoteResponse(entity.id, entity.title, entity.body, entity.date_created, entity.date_modified);
+        var response = new NoteResponse(
+            entity.id, entity.title, entity.description, entity.body, entity.date_created, entity.date_modified);
 
         return TypedResults.Ok(response);
     }
@@ -71,12 +73,13 @@ public static class UpdateNoteEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateNoteRequest(string? Title, string? Body);
+    public sealed record UpdateNoteRequest(string? Title, string? Description, string? Body);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
         long Id,
         string? Title,
+        string? Description,
         string? Body,
         DateTime DateCreated,
         DateTime? DateModified);

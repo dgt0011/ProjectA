@@ -16,7 +16,7 @@ public class EditModel(IToDoApiClient toDoApiClient, ICategoriesApiClient catego
     [BindProperty]
     public ToDoEditInput Form { get; set; } = new();
 
-    public List<string> CategorySuggestions { get; set; } = [];
+    public List<CategoryDto> AvailableCategories { get; set; } = [];
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -30,12 +30,12 @@ public class EditModel(IToDoApiClient toDoApiClient, ICategoriesApiClient catego
         Form = new ToDoEditInput
         {
             Title = result.Value.Title,
-            Category = result.Value.Category,
+            CategoryId = result.Value.CategoryId,
             Description = result.Value.Description,
             Done = result.Value.Done
         };
 
-        await LoadCategorySuggestionsAsync(cancellationToken);
+        await LoadCategoriesAsync(cancellationToken);
         return Page();
     }
 
@@ -43,7 +43,7 @@ public class EditModel(IToDoApiClient toDoApiClient, ICategoriesApiClient catego
     {
         if (!ModelState.IsValid)
         {
-            await LoadCategorySuggestionsAsync(cancellationToken);
+            await LoadCategoriesAsync(cancellationToken);
             return Page();
         }
 
@@ -56,7 +56,7 @@ public class EditModel(IToDoApiClient toDoApiClient, ICategoriesApiClient catego
                 ModelState.AddModelError(string.Empty, result.ToDisplayMessage("Could not update the ToDo item."));
             }
 
-            await LoadCategorySuggestionsAsync(cancellationToken);
+            await LoadCategoriesAsync(cancellationToken);
             return Page();
         }
 
@@ -64,16 +64,12 @@ public class EditModel(IToDoApiClient toDoApiClient, ICategoriesApiClient catego
         return RedirectToPage("Index");
     }
 
-    private async Task LoadCategorySuggestionsAsync(CancellationToken cancellationToken)
+    private async Task LoadCategoriesAsync(CancellationToken cancellationToken)
     {
-        var categories = await categoriesApiClient.GetListAsync(cancellationToken);
-        if (categories.IsSuccess)
+        var result = await categoriesApiClient.GetListAsync(cancellationToken);
+        if (result.IsSuccess)
         {
-            CategorySuggestions = (categories.Value ?? [])
-                .Select(category => category.Title)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(title => title, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            AvailableCategories = result.Value ?? [];
         }
     }
 }

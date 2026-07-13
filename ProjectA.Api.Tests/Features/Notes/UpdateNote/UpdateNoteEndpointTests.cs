@@ -46,7 +46,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithValidRequest_UpdatesAndReturnsOk()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", "Updated body");
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", "Updated summary", "Updated body");
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -56,6 +56,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
         Assert.NotNull(updated);
         Assert.Equal(id, updated.Id);
         Assert.Equal($"{TitlePrefix} Updated", updated.Title);
+        Assert.Equal("Updated summary", updated.Description);
         Assert.Equal("Updated body", updated.Body);
         Assert.NotNull(updated.DateModified);
     }
@@ -63,7 +64,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Missing", null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Missing", null, null);
 
         var response = await _client.PutAsJsonAsync("/api/notes/999999", request, JsonOptions);
 
@@ -74,7 +75,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithNeitherTitleNorBody_ReturnsValidationProblem()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest(null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest(null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 

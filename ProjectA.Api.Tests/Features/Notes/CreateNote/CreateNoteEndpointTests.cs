@@ -37,7 +37,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithValidRequest_CreatesNoteAndReturnsCreated()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} New", "Some body text");
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} New", "A short summary", "Some body text");
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -49,6 +49,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
         Assert.True(created.Id > 0);
         Assert.Contains($"/api/notes/{created.Id}", response.Headers.Location!.ToString());
         Assert.Equal($"{TitlePrefix} New", created.Title);
+        Assert.Equal("A short summary", created.Description);
         Assert.Equal("Some body text", created.Body);
     }
 
@@ -56,7 +57,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     public async Task Post_WithOnlyBody_Succeeds()
     {
         // Title is nullable in the schema; a body-only note should still be creatable.
-        var request = new CreateNoteEndpoint.CreateNoteRequest(null, $"{TitlePrefix} body-only content");
+        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null, $"{TitlePrefix} body-only content");
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -66,7 +67,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithNeitherTitleNorBody_ReturnsValidationProblem()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 

@@ -29,6 +29,7 @@ public static class CreateNoteEndpoint
         var entity = new NoteDto
         {
             title = request.Title,
+            description = request.Description,
             body = request.Body,
             date_created = DateTime.UtcNow
         };
@@ -36,7 +37,8 @@ public static class CreateNoteEndpoint
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
         await connection.InsertAsync(entity);
 
-        var response = new NoteResponse(entity.id, entity.title, entity.body, entity.date_created, entity.date_modified);
+        var response = new NoteResponse(
+            entity.id, entity.title, entity.description, entity.body, entity.date_created, entity.date_modified);
 
         return TypedResults.CreatedAtRoute(response, "GetNoteById", new { id = response.Id });
     }
@@ -58,12 +60,13 @@ public static class CreateNoteEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateNoteRequest(string? Title, string? Body);
+    public sealed record CreateNoteRequest(string? Title, string? Description, string? Body);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
         long Id,
         string? Title,
+        string? Description,
         string? Body,
         DateTime DateCreated,
         DateTime? DateModified);

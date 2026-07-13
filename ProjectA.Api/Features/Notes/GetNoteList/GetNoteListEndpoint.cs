@@ -27,6 +27,7 @@ public static class GetNoteListEndpoint
                 .Select(entity => new NoteListItemResponse(
                     entity.id,
                     entity.title,
+                    entity.description,
                     entity.body,
                     entity.date_created,
                     entity.date_modified))
@@ -45,6 +46,7 @@ public static class GetNoteListEndpoint
     public sealed record NoteListItemResponse(
         long Id,
         string? Title,
+        string? Description,
         string? Body,
         DateTime DateCreated,
         DateTime? DateModified);

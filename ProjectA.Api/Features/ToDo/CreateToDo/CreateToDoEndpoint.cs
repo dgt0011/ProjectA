@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.ToDo.CreateToDo;
@@ -11,7 +12,7 @@ public static class CreateToDoEndpoint
         group.MapPost("", Handle)
             .WithName("CreateToDo")
             .WithSummary("Create a ToDo")
-            .WithDescription("Creates a new outstanding ToDo item.")
+            .WithDescription("Creates a new outstanding ToDo item, associated with exactly one category.")
             .RequireAuthorization();
     }
 
@@ -30,17 +31,28 @@ public static class CreateToDoEndpoint
         {
             title = request.Title,
             actioned = false,
-            category = request.Category,
+            category_id = request.CategoryId,
             description = request.Description,
             date_created = DateTime.UtcNow
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-        await connection.InsertAsync(entity);
+
+        try
+        {
+            await connection.InsertAsync(entity);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryId)] = ["CategoryId does not refer to an existing category."]
+            });
+        }
 
         var response = new ToDoResponse(
             entity.id,
-            entity.category,
+            entity.category_id,
             entity.title,
             entity.description,
             entity.date_created,
@@ -59,21 +71,21 @@ public static class CreateToDoEndpoint
             errors[nameof(request.Title)] = ["Title is required."];
         }
 
-        if (string.IsNullOrWhiteSpace(request.Category))
+        if (request.CategoryId is null)
         {
-            errors[nameof(request.Category)] = ["Category is required."];
+            errors[nameof(request.CategoryId)] = ["CategoryId is required."];
         }
 
         return errors;
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateToDoRequest(string Title, string Category, string? Description);
+    public sealed record CreateToDoRequest(string Title, long? CategoryId, string? Description);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record ToDoResponse(
         long Id,
-        string Category,
+        long? CategoryId,
         string Title,
         string? Description,
         DateTime? DateCreated,

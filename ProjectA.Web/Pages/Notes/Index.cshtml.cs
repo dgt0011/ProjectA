@@ -7,21 +7,8 @@ namespace ProjectA.Web.Pages.Notes;
 
 public class IndexModel(INotesApiClient notesApiClient) : PageModel
 {
-    private const int ExcerptLength = 120;
-
     public List<NoteDto> Notes { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
-
-    public string Excerpt(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return string.Empty;
-        }
-
-        var singleLine = body.ReplaceLineEndings(" ");
-        return singleLine.Length <= ExcerptLength ? singleLine : singleLine[..ExcerptLength] + "…";
-    }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {

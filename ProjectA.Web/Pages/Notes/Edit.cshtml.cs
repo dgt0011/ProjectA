@@ -25,7 +25,12 @@ public class EditModel(INotesApiClient notesApiClient) : PageModel
             return RedirectToPage("Index");
         }
 
-        Form = new NoteInput { Title = result.Value.Title, Body = result.Value.Body };
+        Form = new NoteInput
+        {
+            Title = result.Value.Title,
+            Description = result.Value.Description,
+            Body = result.Value.Body
+        };
         return Page();
     }
 

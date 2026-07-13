@@ -12,11 +12,12 @@ namespace ProjectA.Api.Tests.Features.ToDo.UpdateToDo;
 [Collection(nameof(ApiCollection))]
 public class UpdateToDoEndpointTests : IAsyncLifetime
 {
-    private const string TestCategory = "Update Test Category";
+    private const string TestCategoryTitle = "Update Test Category";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
     private readonly IDbConnectionFactory _connectionFactory;
+    private long _categoryId;
 
     public UpdateToDoEndpointTests(ApiFactory factory)
     {
@@ -24,31 +25,42 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
-    public async Task InitializeAsync() => await CleanUpAsync();
+    public async Task InitializeAsync()
+    {
+        await CleanUpAsync();
+
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        _categoryId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
+            new { Title = TestCategoryTitle });
+    }
 
     public async Task DisposeAsync() => await CleanUpAsync();
 
     private async Task CleanUpAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
-        await connection.ExecuteAsync("DELETE FROM todos WHERE category = @Category;", new { Category = TestCategory });
+        await connection.ExecuteAsync(
+            "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title = @Title);",
+            new { Title = TestCategoryTitle });
+        await connection.ExecuteAsync("DELETE FROM categories WHERE title = @Title;", new { Title = TestCategoryTitle });
     }
 
     private async Task<long> SeedToDoAsync(bool actioned = false)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         return await connection.QuerySingleAsync<long>(
-            "INSERT INTO todos (title, actioned, category, description, date_created) " +
-            "VALUES ('Original Title', @Actioned, @Category, 'Original description', now()) " +
+            "INSERT INTO todos (title, actioned, category_id, description, date_created) " +
+            "VALUES ('Original Title', @Actioned, @CategoryId, 'Original description', now()) " +
             "RETURNING id;",
-            new { Actioned = actioned, Category = TestCategory });
+            new { Actioned = actioned, CategoryId = _categoryId });
     }
 
     [Fact]
     public async Task Put_WithValidRequest_UpdatesAndReturnsOk()
     {
         var id = await SeedToDoAsync();
-        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Updated Title", TestCategory, "Updated description", true);
+        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Updated Title", _categoryId, "Updated description", true);
 
         var response = await _client.PutAsJsonAsync($"/api/todo/{id}", request, JsonOptions);
 
@@ -58,6 +70,7 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
         Assert.NotNull(updated);
         Assert.Equal(id, updated.Id);
         Assert.Equal("Updated Title", updated.Title);
+        Assert.Equal(_categoryId, updated.CategoryId);
         Assert.Equal("Updated description", updated.Description);
         Assert.True(updated.Done);
         Assert.NotNull(updated.DateModified);
@@ -66,7 +79,7 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
-        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Doesn't matter", TestCategory, null, false);
+        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Doesn't matter", _categoryId, null, false);
 
         var response = await _client.PutAsJsonAsync("/api/todo/999999", request, JsonOptions);
 
@@ -78,7 +91,7 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     public async Task Put_WithMissingTitle_ReturnsValidationProblem()
     {
         var id = await SeedToDoAsync();
-        var request = new UpdateToDoEndpoint.UpdateToDoRequest(" ", TestCategory, null, false);
+        var request = new UpdateToDoEndpoint.UpdateToDoRequest(" ", _categoryId, null, false);
 
         var response = await _client.PutAsJsonAsync($"/api/todo/{id}", request, JsonOptions);
 
@@ -86,10 +99,25 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Put_WithCategoryIdThatDoesNotExist_ReturnsValidationProblem()
+    {
+        var id = await SeedToDoAsync();
+        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Original Title", 999999, null, false);
+
+        var response = await _client.PutAsJsonAsync($"/api/todo/{id}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("CategoryId"));
+    }
+
+    [Fact]
     public async Task Put_CanMarkToDoAsDone()
     {
         var id = await SeedToDoAsync(actioned: false);
-        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Original Title", TestCategory, "Original description", true);
+        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Original Title", _categoryId, "Original description", true);
 
         var response = await _client.PutAsJsonAsync($"/api/todo/{id}", request, JsonOptions);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -97,4 +125,10 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
         var getResponse = await _client.GetAsync($"/api/todo/{id}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
     }
+
+    private sealed record ValidationProblemResponse(
+        string? Type,
+        string? Title,
+        int? Status,
+        Dictionary<string, string[]> Errors);
 }

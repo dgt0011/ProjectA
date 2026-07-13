@@ -41,7 +41,7 @@ public class NoteEndpointsTests : IAsyncLifetime
         using (var connection = await _connectionFactory.CreateConnectionAsync())
         {
             await connection.ExecuteAsync(
-                "INSERT INTO notes (title, body) VALUES (@TitleA, 'Body A'), (@TitleB, NULL);",
+                "INSERT INTO notes (title, description, body) VALUES (@TitleA, 'Summary A', 'Body A'), (@TitleB, NULL, NULL);",
                 new { TitleA = $"{TitlePrefix} A", TitleB = $"{TitlePrefix} B" });
         }
 
@@ -54,8 +54,8 @@ public class NoteEndpointsTests : IAsyncLifetime
 
         var seeded = notes.Where(n => n.Title != null && n.Title.StartsWith(TitlePrefix)).ToList();
         Assert.Equal(2, seeded.Count);
-        Assert.Contains(seeded, n => n.Title == $"{TitlePrefix} A" && n.Body == "Body A");
-        Assert.Contains(seeded, n => n.Title == $"{TitlePrefix} B" && n.Body == null);
+        Assert.Contains(seeded, n => n.Title == $"{TitlePrefix} A" && n.Description == "Summary A" && n.Body == "Body A");
+        Assert.Contains(seeded, n => n.Title == $"{TitlePrefix} B" && n.Description == null && n.Body == null);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class NoteEndpointsTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         var id = await connection.QuerySingleAsync<long>(
-            "INSERT INTO notes (title, body) VALUES (@Title, 'Some body') RETURNING id;",
+            "INSERT INTO notes (title, description, body) VALUES (@Title, 'A summary', 'Some body') RETURNING id;",
             new { Title = $"{TitlePrefix} ById" });
 
         var response = await _client.GetAsync($"/api/notes/{id}");
@@ -74,6 +74,7 @@ public class NoteEndpointsTests : IAsyncLifetime
         Assert.NotNull(note);
         Assert.Equal(id, note.Id);
         Assert.Equal($"{TitlePrefix} ById", note.Title);
+        Assert.Equal("A summary", note.Description);
         Assert.Equal("Some body", note.Body);
     }
 

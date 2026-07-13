@@ -15,15 +15,22 @@
         <span asp-validation-for="Form.Title" class="text-danger"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="Form.Category" class="form-label"></label>
-        <input asp-for="Form.Category" class="form-control" list="category-suggestions" />
-        <datalist id="category-suggestions">
-            @foreach (var category in Model.CategorySuggestions)
-            {
-                <option value="@category"></option>
-            }
-        </datalist>
-        <span asp-validation-for="Form.Category" class="text-danger"></span>
+        <label asp-for="Form.CategoryId" class="form-label"></label>
+        @if (Model.AvailableCategories.Count == 0)
+        {
+            <p class="text-muted">No categories exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.CategoryId" class="form-select">
+                <option value="">Select a category...</option>
+                @foreach (var category in Model.AvailableCategories)
+                {
+                    <option value="@category.Id">@category.Title</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.CategoryId" class="text-danger"></span>
     </div>
     <div class="mb-3">
         <label asp-for="Form.Description" class="form-label"></label>

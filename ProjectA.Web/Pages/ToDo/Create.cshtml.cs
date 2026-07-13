@@ -13,18 +13,18 @@ public class CreateModel(IToDoApiClient toDoApiClient, ICategoriesApiClient cate
     [BindProperty]
     public ToDoCreateInput Form { get; set; } = new();
 
-    public List<string> CategorySuggestions { get; set; } = [];
+    public List<CategoryDto> AvailableCategories { get; set; } = [];
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        await LoadCategorySuggestionsAsync(cancellationToken);
+        await LoadCategoriesAsync(cancellationToken);
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
-            await LoadCategorySuggestionsAsync(cancellationToken);
+            await LoadCategoriesAsync(cancellationToken);
             return Page();
         }
 
@@ -37,7 +37,7 @@ public class CreateModel(IToDoApiClient toDoApiClient, ICategoriesApiClient cate
                 ModelState.AddModelError(string.Empty, result.ToDisplayMessage("Could not create the ToDo item."));
             }
 
-            await LoadCategorySuggestionsAsync(cancellationToken);
+            await LoadCategoriesAsync(cancellationToken);
             return Page();
         }
 
@@ -45,16 +45,12 @@ public class CreateModel(IToDoApiClient toDoApiClient, ICategoriesApiClient cate
         return RedirectToPage("Index");
     }
 
-    private async Task LoadCategorySuggestionsAsync(CancellationToken cancellationToken)
+    private async Task LoadCategoriesAsync(CancellationToken cancellationToken)
     {
-        var categories = await categoriesApiClient.GetListAsync(cancellationToken);
-        if (categories.IsSuccess)
+        var result = await categoriesApiClient.GetListAsync(cancellationToken);
+        if (result.IsSuccess)
         {
-            CategorySuggestions = (categories.Value ?? [])
-                .Select(category => category.Title)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(title => title, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            AvailableCategories = result.Value ?? [];
         }
     }
 }

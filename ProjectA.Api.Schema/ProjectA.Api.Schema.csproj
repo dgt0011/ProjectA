@@ -21,6 +21,10 @@
       <EmbeddedResource Include="Scripts\script003-CreateTables-Categories-bookmarks-attachments-notes-projects.sql" />
       <None Remove="Scripts\script004-CreateTable-Users.sql" />
       <EmbeddedResource Include="Scripts\script004-CreateTable-Users.sql" />
+      <None Remove="Scripts\script005-AlterTable-ToDo-Drop-Category.sql" />
+      <EmbeddedResource Include="Scripts\script005-AlterTable-ToDo-Drop-Category.sql" />
+      <None Remove="Scripts\script006-AlterTable-Notes-Add-Description.sql" />
+      <EmbeddedResource Include="Scripts\script006-AlterTable-Notes-Add-Description.sql" />
     </ItemGroup>
 
 </Project>

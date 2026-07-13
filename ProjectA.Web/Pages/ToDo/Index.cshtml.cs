@@ -5,7 +5,7 @@ using ProjectA.Web.Services;
 
 namespace ProjectA.Web.Pages.ToDo;
 
-public class IndexModel(IToDoApiClient toDoApiClient) : PageModel
+public class IndexModel(IToDoApiClient toDoApiClient, ICategoriesApiClient categoriesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public bool IncludeDone { get; set; }
@@ -13,9 +13,20 @@ public class IndexModel(IToDoApiClient toDoApiClient) : PageModel
     public List<ToDoDto> ToDoItems { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
 
+    private Dictionary<long, string> _categoryTitlesById = [];
+
+    public string CategoryTitle(long? categoryId) =>
+        categoryId is null
+            ? "-"
+            : _categoryTitlesById.GetValueOrDefault(categoryId.Value, $"#{categoryId}");
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var result = await toDoApiClient.GetListAsync(IncludeDone, cancellationToken);
+        var toDoTask = toDoApiClient.GetListAsync(IncludeDone, cancellationToken);
+        var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
+        await Task.WhenAll(toDoTask, categoriesTask);
+
+        var result = await toDoTask;
         if (result.IsSuccess)
         {
             ToDoItems = result.Value ?? [];
@@ -23,6 +34,12 @@ public class IndexModel(IToDoApiClient toDoApiClient) : PageModel
         else
         {
             LoadedSuccessfully = false;
+        }
+
+        var categoriesResult = await categoriesTask;
+        if (categoriesResult.IsSuccess)
+        {
+            _categoryTitlesById = (categoriesResult.Value ?? []).ToDictionary(category => category.Id, category => category.Title);
         }
     }
 

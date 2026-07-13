@@ -26,7 +26,7 @@ else
         <thead>
             <tr>
                 <th>Title</th>
-                <th>Body preview</th>
+                <th>Description</th>
                 <th>Last modified</th>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
@@ -39,7 +39,7 @@ else
             {
                 <tr>
                     <td>@note.Title</td>
-                    <td class="text-muted">@Model.Excerpt(note.Body)</td>
+                    <td class="text-muted">@note.Description</td>
                     <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
                     @if (User.Identity?.IsAuthenticated == true)
                     {

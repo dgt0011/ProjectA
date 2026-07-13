@@ -29,6 +29,7 @@ public static class GetNoteByIdEndpoint
                 var response = new NoteResponse(
                     entity.id,
                     entity.title,
+                    entity.description,
                     entity.body,
                     entity.date_created,
                     entity.date_modified);
@@ -52,6 +53,7 @@ public static class GetNoteByIdEndpoint
     public sealed record NoteResponse(
         long Id,
         string? Title,
+        string? Description,
         string? Body,
         DateTime DateCreated,
         DateTime? DateModified);

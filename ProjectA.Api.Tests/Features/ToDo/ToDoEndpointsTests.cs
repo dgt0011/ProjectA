@@ -133,14 +133,19 @@ public static class SeedToDoTestDataExtension
         }
 
         // clear any remaining test data
-        connection.Execute("DELETE FROM todos WHERE category = 'Test Category';");
+        connection.Execute(
+            "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title = 'Test Category');");
+        connection.Execute("DELETE FROM categories WHERE title = 'Test Category';");
 
-        var toDoInsert = "INSERT INTO todos (title, actioned, category, description, date_created, date_modified)";
+        var categoryId = connection.QuerySingle<long>(
+            "INSERT INTO categories (title) VALUES ('Test Category') RETURNING id;");
+
+        var toDoInsert = "INSERT INTO todos (title, actioned, category_id, description, date_created, date_modified)";
         toDoInsert += "VALUES";
 
-        var todoOne = "('Test 1 ToDo',false,'Test Category','Test 1 ToDo Description','2026-01-01 10:30:00.000 +0000',null) ";
-        var todoTwo = "('Test 2 ToDo',false,'Test Category','Test 2 ToDo Description','2026-02-02 10:30:00.000 +0000','2026-02-02 11:30:00.000 +0000');";
-        var todoThree = "('Test 3 ToDo',true,'Test Category','Test 3 ToDo Description','2026-03-03 10:30:00.000 +0000','2026-03-03 10:30:00.000 +0000');";
+        var todoOne = $"('Test 1 ToDo',false,{categoryId},'Test 1 ToDo Description','2026-01-01 10:30:00.000 +0000',null) ";
+        var todoTwo = $"('Test 2 ToDo',false,{categoryId},'Test 2 ToDo Description','2026-02-02 10:30:00.000 +0000','2026-02-02 11:30:00.000 +0000');";
+        var todoThree = $"('Test 3 ToDo',true,{categoryId},'Test 3 ToDo Description','2026-03-03 10:30:00.000 +0000','2026-03-03 10:30:00.000 +0000');";
 
         connection.Execute($"{toDoInsert} {todoOne}");
         connection.Execute($"{toDoInsert} {todoTwo}");

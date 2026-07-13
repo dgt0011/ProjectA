@@ -5,7 +5,7 @@ namespace ProjectA.Web.Models;
 public sealed class ToDoDto
 {
     public long Id { get; set; }
-    public string Category { get; set; } = string.Empty;
+    public long? CategoryId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public DateTime? DateCreated { get; set; }
@@ -21,11 +21,9 @@ public sealed class ToDoCreateInput
     [StringLength(255)]
     public string Title { get; set; } = string.Empty;
 
-    // Free text, not a CategoryId - ProjectA.Api's ToDo endpoints still use the original
-    // `category` text column, not the (currently unused) category_id foreign key.
     [Required(ErrorMessage = "Category is required.")]
-    [StringLength(128)]
-    public string Category { get; set; } = string.Empty;
+    [Display(Name = "Category")]
+    public long? CategoryId { get; set; }
 
     public string? Description { get; set; }
 }
@@ -38,8 +36,8 @@ public sealed class ToDoEditInput
     public string Title { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Category is required.")]
-    [StringLength(128)]
-    public string Category { get; set; } = string.Empty;
+    [Display(Name = "Category")]
+    public long? CategoryId { get; set; }
 
     public string? Description { get; set; }
 
