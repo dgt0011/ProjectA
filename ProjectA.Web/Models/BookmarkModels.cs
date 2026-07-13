@@ -16,9 +16,9 @@ public sealed class BookmarkDto
 
 // Bound by both Create and Edit pages - CreateBookmarkRequest and UpdateBookmarkRequest
 // share the same (Url, Title, Description, Rating, CategoryIds) shape. CategoryIds always
-// reflects exactly the categories checked on the form, so it is sent as an explicit list
-// (never null/omitted) - this page never needs the API's "omit CategoryIds to leave
-// associations unchanged" behaviour, since the checkboxes always show the current state.
+// reflects exactly the categories selected in the multi-select list, so it is sent as an
+// explicit list (never null/omitted) - this page never needs the API's "omit CategoryIds to
+// leave associations unchanged" behaviour, since the select always shows the current state.
 public sealed class BookmarkInput
 {
     [Required(ErrorMessage = "Url is required.")]

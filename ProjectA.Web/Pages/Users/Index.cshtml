@@ -32,7 +32,10 @@ else
             <tr>
                 <th>Username</th>
                 <th>Created</th>
-                <th class="text-end">Actions</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -41,15 +44,15 @@ else
                 <tr>
                     <td>@user.Username</td>
                     <td>@user.DateCreated.ToLocalTime().ToString("g")</td>
-                    <td class="text-end">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
                             <form method="post" asp-page-handler="Delete" asp-route-id="@user.Id" class="d-inline"
                                   onsubmit="return confirm('Delete this user?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                             </form>
-                        }
-                    </td>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>

@@ -29,7 +29,10 @@ else
                 <th>Description</th>
                 <th>S3 ARN</th>
                 <th>Created</th>
-                <th class="text-end">Actions</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -40,16 +43,16 @@ else
                     <td>@attachment.Description</td>
                     <td class="text-break"><code>@attachment.S3Arn</code></td>
                     <td>@attachment.DateCreated.ToLocalTime().ToString("g")</td>
-                    <td class="text-end">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
                             <a asp-page="Edit" asp-route-id="@attachment.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                             <form method="post" asp-page-handler="Delete" asp-route-id="@attachment.Id" class="d-inline"
                                   onsubmit="return confirm('Delete this attachment?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                             </form>
-                        }
-                    </td>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>

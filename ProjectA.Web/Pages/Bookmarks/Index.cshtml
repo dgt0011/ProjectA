@@ -29,7 +29,10 @@ else
                 <th>Url</th>
                 <th>Rating</th>
                 <th>Categories</th>
-                <th class="text-end">Actions</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -45,16 +48,16 @@ else
                             <span class="badge bg-secondary me-1">@Model.CategoryTitle(categoryId)</span>
                         }
                     </td>
-                    <td class="text-end">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
                             <a asp-page="Edit" asp-route-id="@bookmark.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                             <form method="post" asp-page-handler="Delete" asp-route-id="@bookmark.Id" class="d-inline"
                                   onsubmit="return confirm('Delete this bookmark?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                             </form>
-                        }
-                    </td>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>

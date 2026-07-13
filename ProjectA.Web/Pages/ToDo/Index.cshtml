@@ -35,7 +35,10 @@ else
                 <th>Title</th>
                 <th>Category</th>
                 <th>Description</th>
-                <th class="text-end">Actions</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -46,16 +49,16 @@ else
                     <td>@item.Title</td>
                     <td><span class="badge bg-secondary">@item.Category</span></td>
                     <td>@item.Description</td>
-                    <td class="text-end">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
                             <a asp-page="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                             <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id" class="d-inline"
                                   onsubmit="return confirm('Delete this ToDo item?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                             </form>
-                        }
-                    </td>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>

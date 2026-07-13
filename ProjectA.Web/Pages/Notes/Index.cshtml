@@ -28,7 +28,10 @@ else
                 <th>Title</th>
                 <th>Body preview</th>
                 <th>Last modified</th>
-                <th class="text-end">Actions</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -38,16 +41,16 @@ else
                     <td>@note.Title</td>
                     <td class="text-muted">@Model.Excerpt(note.Body)</td>
                     <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
-                    <td class="text-end">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
                             <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                             <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
                                   onsubmit="return confirm('Delete this note?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                             </form>
-                        }
-                    </td>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>
