@@ -27,3 +27,22 @@ textarea.form-control {
 .EasyMDEContainer .CodeMirror {
     min-height: 320px;
 }
+
+/* Bookmark rating, shown as a 5-segment bar - each segment represents 2 points of the
+   underlying 1-10 rating scale. */
+.rating-bar {
+    display: inline-flex;
+    gap: 3px;
+    vertical-align: middle;
+}
+
+.rating-segment {
+    width: 16px;
+    height: 10px;
+    border-radius: 2px;
+    background-color: #e9ecef;
+}
+
+.rating-segment.filled {
+    background-color: #0d6efd;
+}
