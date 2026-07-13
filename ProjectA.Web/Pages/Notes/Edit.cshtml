@@ -24,6 +24,40 @@
         <textarea asp-for="Form.Body" class="form-control" rows="12"></textarea>
         <span asp-validation-for="Form.Body" class="text-danger"></span>
     </div>
+    <div class="mb-3">
+        <label asp-for="Form.BookmarkIds" class="form-label"></label>
+        @if (Model.AvailableBookmarks.Count == 0)
+        {
+            <p class="text-muted">No bookmarks exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.BookmarkIds" class="form-select" multiple size="@Math.Min(Model.AvailableBookmarks.Count, 6)">
+                @foreach (var bookmark in Model.AvailableBookmarks)
+                {
+                    <option value="@bookmark.Id">@(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.BookmarkIds" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.AttachmentIds" class="form-label"></label>
+        @if (Model.AvailableAttachments.Count == 0)
+        {
+            <p class="text-muted">No attachments exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.AttachmentIds" class="form-select" multiple size="@Math.Min(Model.AvailableAttachments.Count, 6)">
+                @foreach (var attachment in Model.AvailableAttachments)
+                {
+                    <option value="@attachment.Id">@(string.IsNullOrWhiteSpace(attachment.Title) ? attachment.S3Arn : attachment.Title)</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.AttachmentIds" class="text-danger"></span>
+    </div>
     <button type="submit" class="btn btn-primary">Save</button>
     <a asp-page="Index" class="btn btn-link">Cancel</a>
 </form>

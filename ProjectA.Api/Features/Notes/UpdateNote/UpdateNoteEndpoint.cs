@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.Notes.UpdateNote;
@@ -11,7 +12,10 @@ public static class UpdateNoteEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateNote")
             .WithSummary("Update a note")
-            .WithDescription("Replaces an existing note's title and body.")
+            .WithDescription(
+                "Replaces an existing note's title, description and body. If BookmarkIds/" +
+                "AttachmentIds is supplied it replaces that association (pass an empty array " +
+                "to clear it) - omit it entirely to leave it unchanged.")
             .RequireAuthorization();
     }
 
@@ -34,10 +38,12 @@ public static class UpdateNoteEndpoint
             type: "https://tools.ietf.org/html/rfc7231#section-6.5.4");
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
 
-        var entity = await connection.GetAsync<NoteDto>((long)id);
+        var entity = await connection.GetAsync<NoteDto>((long)id, transaction);
         if (entity is null)
         {
+            transaction.Rollback();
             return notFound;
         }
 
@@ -46,14 +52,60 @@ public static class UpdateNoteEndpoint
         entity.body = request.Body;
         entity.date_modified = DateTime.UtcNow;
 
-        var updated = await connection.UpdateAsync(entity);
+        var updated = await connection.UpdateAsync(entity, transaction);
         if (!updated)
         {
+            transaction.Rollback();
             return notFound;
         }
 
+        // Null means "don't touch the association" (same convention as Bookmarks'
+        // CategoryIds); an explicit list, even empty, replaces it.
+        List<long> bookmarkIds;
+        try
+        {
+            bookmarkIds = request.BookmarkIds is not null
+                ? await NoteBookmarkLinks.ReplaceAsync(connection, transaction, entity.id, request.BookmarkIds, cancellationToken)
+                : await NoteBookmarkLinks.GetBookmarkIdsAsync(connection, entity.id, cancellationToken, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.BookmarkIds)] = ["One or more BookmarkIds do not refer to an existing bookmark."]
+            });
+        }
+
+        List<long> attachmentIds;
+        try
+        {
+            attachmentIds = request.AttachmentIds is not null
+                ? await NoteAttachmentLinks.ReplaceAsync(connection, transaction, entity.id, request.AttachmentIds, cancellationToken)
+                : await NoteAttachmentLinks.GetAttachmentIdsAsync(connection, entity.id, cancellationToken, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.AttachmentIds)] = ["One or more AttachmentIds do not refer to an existing attachment."]
+            });
+        }
+
+        transaction.Commit();
+
         var response = new NoteResponse(
-            entity.id, entity.title, entity.description, entity.body, entity.date_created, entity.date_modified);
+            entity.id,
+            entity.title,
+            entity.description,
+            entity.body,
+            entity.date_created,
+            entity.date_modified,
+            bookmarkIds,
+            attachmentIds);
 
         return TypedResults.Ok(response);
     }
@@ -73,7 +125,12 @@ public static class UpdateNoteEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateNoteRequest(string? Title, string? Description, string? Body);
+    public sealed record UpdateNoteRequest(
+        string? Title,
+        string? Description,
+        string? Body,
+        IReadOnlyCollection<long>? BookmarkIds,
+        IReadOnlyCollection<long>? AttachmentIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
@@ -82,5 +139,7 @@ public static class UpdateNoteEndpoint
         string? Description,
         string? Body,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> BookmarkIds,
+        IReadOnlyCollection<long> AttachmentIds);
 }

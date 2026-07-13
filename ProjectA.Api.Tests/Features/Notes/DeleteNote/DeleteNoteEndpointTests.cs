@@ -10,6 +10,8 @@ namespace ProjectA.Api.Tests.Features.Notes.DeleteNote;
 public class DeleteNoteEndpointTests : IAsyncLifetime
 {
     private const string TitlePrefix = "Delete Test Note";
+    private const string LinkedBookmarkUrl = "https://example.com/delete-test-note-bookmark";
+    private const string LinkedAttachmentTitle = "Delete Test Note Attachment";
 
     private readonly HttpClient _client;
     private readonly IDbConnectionFactory _connectionFactory;
@@ -29,7 +31,8 @@ public class DeleteNoteEndpointTests : IAsyncLifetime
         using var connection = await _connectionFactory.CreateConnectionAsync();
 
         // Delete the join rows first - otherwise the FK constraint this cleanup exists to
-        // work around would stop the note/project/category rows themselves being removed.
+        // work around would stop the note/project/category/bookmark/attachment rows
+        // themselves being removed.
         await connection.ExecuteAsync(
             "DELETE FROM project_notes WHERE " +
             "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern) OR " +
@@ -40,9 +43,21 @@ public class DeleteNoteEndpointTests : IAsyncLifetime
             "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern) OR " +
             "category_id IN (SELECT id FROM categories WHERE title LIKE @Pattern);",
             new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM note_bookmarks WHERE " +
+            "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern) OR bookmark_id IN " +
+            "(SELECT id FROM bookmarks WHERE url = @BookmarkUrl);",
+            new { Pattern = $"{TitlePrefix}%", BookmarkUrl = LinkedBookmarkUrl });
+        await connection.ExecuteAsync(
+            "DELETE FROM note_attachments WHERE " +
+            "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern) OR attachment_id IN " +
+            "(SELECT id FROM attachments WHERE title = @AttachmentTitle);",
+            new { Pattern = $"{TitlePrefix}%", AttachmentTitle = LinkedAttachmentTitle });
         await connection.ExecuteAsync("DELETE FROM projects WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM notes WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync("DELETE FROM bookmarks WHERE url = @BookmarkUrl;", new { BookmarkUrl = LinkedBookmarkUrl });
+        await connection.ExecuteAsync("DELETE FROM attachments WHERE title = @AttachmentTitle;", new { AttachmentTitle = LinkedAttachmentTitle });
     }
 
     private async Task<long> SeedNoteAsync(string suffix)
@@ -128,5 +143,51 @@ public class DeleteNoteEndpointTests : IAsyncLifetime
             "SELECT COUNT(*) FROM note_categories WHERE note_id = @NoteId;",
             new { NoteId = noteId });
         Assert.Equal(0, remainingLinks);
+    }
+
+    [Fact]
+    public async Task Delete_WhenHasBookmarkAndAttachmentAssociations_SucceedsAndLeavesThemIntact()
+    {
+        var noteId = await SeedNoteAsync("WithBookmarkAndAttachment");
+
+        long bookmarkId;
+        long attachmentId;
+        using (var connection = await _connectionFactory.CreateConnectionAsync())
+        {
+            bookmarkId = await connection.QuerySingleAsync<long>(
+                "INSERT INTO bookmarks (url) VALUES (@Url) RETURNING id;",
+                new { Url = LinkedBookmarkUrl });
+            attachmentId = await connection.QuerySingleAsync<long>(
+                "INSERT INTO attachments (title, s3_arn) VALUES (@Title, 'arn:aws:s3:::test/bucket') RETURNING id;",
+                new { Title = LinkedAttachmentTitle });
+
+            await connection.ExecuteAsync(
+                "INSERT INTO note_bookmarks (note_id, bookmark_id) VALUES (@NoteId, @BookmarkId);",
+                new { NoteId = noteId, BookmarkId = bookmarkId });
+            await connection.ExecuteAsync(
+                "INSERT INTO note_attachments (note_id, attachment_id) VALUES (@NoteId, @AttachmentId);",
+                new { NoteId = noteId, AttachmentId = attachmentId });
+        }
+
+        // Neither association should block deletion...
+        var response = await _client.DeleteAsync($"/api/notes/{noteId}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        // ...and the bookmark and attachment themselves must survive, untouched.
+        var bookmarkResponse = await _client.GetAsync($"/api/bookmarks/{bookmarkId}");
+        Assert.Equal(HttpStatusCode.OK, bookmarkResponse.StatusCode);
+        var attachmentResponse = await _client.GetAsync($"/api/attachments/{attachmentId}");
+        Assert.Equal(HttpStatusCode.OK, attachmentResponse.StatusCode);
+
+        // The join rows should be gone too, not left dangling.
+        using var verifyConnection = await _connectionFactory.CreateConnectionAsync();
+        var remainingBookmarkLinks = await verifyConnection.QuerySingleAsync<long>(
+            "SELECT COUNT(*) FROM note_bookmarks WHERE note_id = @NoteId;",
+            new { NoteId = noteId });
+        var remainingAttachmentLinks = await verifyConnection.QuerySingleAsync<long>(
+            "SELECT COUNT(*) FROM note_attachments WHERE note_id = @NoteId;",
+            new { NoteId = noteId });
+        Assert.Equal(0, remainingBookmarkLinks);
+        Assert.Equal(0, remainingAttachmentLinks);
     }
 }

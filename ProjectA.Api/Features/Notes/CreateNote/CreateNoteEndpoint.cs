@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.Notes.CreateNote;
@@ -11,7 +12,8 @@ public static class CreateNoteEndpoint
         group.MapPost("", Handle)
             .WithName("CreateNote")
             .WithSummary("Create a note")
-            .WithDescription("Creates a new note.")
+            .WithDescription(
+                "Creates a new note, optionally associating it with existing bookmarks and/or attachments.")
             .RequireAuthorization();
     }
 
@@ -35,10 +37,53 @@ public static class CreateNoteEndpoint
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-        await connection.InsertAsync(entity);
+        using var transaction = connection.BeginTransaction();
+
+        await connection.InsertAsync(entity, transaction);
+
+        List<long> bookmarkIds;
+        try
+        {
+            bookmarkIds = await NoteBookmarkLinks.ReplaceAsync(
+                connection, transaction, entity.id, request.BookmarkIds, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.BookmarkIds)] = ["One or more BookmarkIds do not refer to an existing bookmark."]
+            });
+        }
+
+        List<long> attachmentIds;
+        try
+        {
+            attachmentIds = await NoteAttachmentLinks.ReplaceAsync(
+                connection, transaction, entity.id, request.AttachmentIds, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.AttachmentIds)] = ["One or more AttachmentIds do not refer to an existing attachment."]
+            });
+        }
+
+        transaction.Commit();
 
         var response = new NoteResponse(
-            entity.id, entity.title, entity.description, entity.body, entity.date_created, entity.date_modified);
+            entity.id,
+            entity.title,
+            entity.description,
+            entity.body,
+            entity.date_created,
+            entity.date_modified,
+            bookmarkIds,
+            attachmentIds);
 
         return TypedResults.CreatedAtRoute(response, "GetNoteById", new { id = response.Id });
     }
@@ -60,7 +105,12 @@ public static class CreateNoteEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateNoteRequest(string? Title, string? Description, string? Body);
+    public sealed record CreateNoteRequest(
+        string? Title,
+        string? Description,
+        string? Body,
+        IReadOnlyCollection<long>? BookmarkIds,
+        IReadOnlyCollection<long>? AttachmentIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
@@ -69,5 +119,7 @@ public static class CreateNoteEndpoint
         string? Description,
         string? Body,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> BookmarkIds,
+        IReadOnlyCollection<long> AttachmentIds);
 }

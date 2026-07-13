@@ -23,6 +23,9 @@ public static class GetNoteListEndpoint
             using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
             var entities = await connection.GetAllAsync<NoteDto>();
 
+            var bookmarkIdsByNote = await NoteBookmarkLinks.GetBookmarkIdsForAllNotesAsync(connection, cancellationToken);
+            var attachmentIdsByNote = await NoteAttachmentLinks.GetAttachmentIdsForAllNotesAsync(connection, cancellationToken);
+
             var items = entities
                 .Select(entity => new NoteListItemResponse(
                     entity.id,
@@ -30,7 +33,9 @@ public static class GetNoteListEndpoint
                     entity.description,
                     entity.body,
                     entity.date_created,
-                    entity.date_modified))
+                    entity.date_modified,
+                    bookmarkIdsByNote[entity.id].ToList(),
+                    attachmentIdsByNote[entity.id].ToList()))
                 .ToList();
 
             return TypedResults.Ok(items);
@@ -49,5 +54,7 @@ public static class GetNoteListEndpoint
         string? Description,
         string? Body,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> BookmarkIds,
+        IReadOnlyCollection<long> AttachmentIds);
 }

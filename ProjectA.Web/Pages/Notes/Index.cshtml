@@ -27,6 +27,8 @@ else
             <tr>
                 <th>Title</th>
                 <th>Description</th>
+                <th>Bookmarks</th>
+                <th>Attachments</th>
                 <th>Last modified</th>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
@@ -42,6 +44,8 @@ else
                         <a asp-page="Details" asp-route-id="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</a>
                     </td>
                     <td class="text-muted">@note.Description</td>
+                    <td>@note.BookmarkIds.Count</td>
+                    <td>@note.AttachmentIds.Count</td>
                     <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
                     @if (User.Identity?.IsAuthenticated == true)
                     {

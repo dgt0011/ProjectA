@@ -10,13 +10,18 @@ public sealed class NoteDto
     public string? Body { get; set; }
     public DateTime DateCreated { get; set; }
     public DateTime? DateModified { get; set; }
+    public List<long> BookmarkIds { get; set; } = [];
+    public List<long> AttachmentIds { get; set; } = [];
 }
 
 // Bound by both Create and Edit pages - CreateNoteRequest and UpdateNoteRequest share the
-// same (Title, Description, Body) shape. Neither Title nor Body is individually [Required]:
-// ProjectA.Api only rejects the request if *both* are blank, so IValidatableObject below
-// mirrors that same cross-field rule client-side instead of always requiring both.
-// Description is always optional - it's just a short summary shown in the Notes list.
+// same (Title, Description, Body, BookmarkIds, AttachmentIds) shape. Neither Title nor Body
+// is individually [Required]: ProjectA.Api only rejects the request if *both* are blank, so
+// IValidatableObject below mirrors that same cross-field rule client-side instead of always
+// requiring both. Description is always optional - it's just a short summary shown in the
+// Notes list. BookmarkIds/AttachmentIds always reflect exactly what's selected in the
+// multi-select lists, so they are sent as explicit lists (never null/omitted) - this page
+// never needs the API's "omit to leave associations unchanged" behaviour.
 public sealed class NoteInput : IValidatableObject
 {
     public string? Title { get; set; }
@@ -25,6 +30,12 @@ public sealed class NoteInput : IValidatableObject
     public string? Description { get; set; }
 
     public string? Body { get; set; }
+
+    [Display(Name = "Bookmarks")]
+    public List<long> BookmarkIds { get; set; } = [];
+
+    [Display(Name = "Attachments")]
+    public List<long> AttachmentIds { get; set; } = [];
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

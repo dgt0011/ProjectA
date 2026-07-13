@@ -8,13 +8,19 @@ using ProjectA.Web.Services;
 namespace ProjectA.Web.Pages.Notes;
 
 [Authorize]
-public class EditModel(INotesApiClient notesApiClient) : PageModel
+public class EditModel(
+    INotesApiClient notesApiClient,
+    IBookmarksApiClient bookmarksApiClient,
+    IAttachmentsApiClient attachmentsApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
 
     [BindProperty]
     public NoteInput Form { get; set; } = new();
+
+    public List<BookmarkDto> AvailableBookmarks { get; set; } = [];
+    public List<AttachmentDto> AvailableAttachments { get; set; } = [];
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -29,8 +35,12 @@ public class EditModel(INotesApiClient notesApiClient) : PageModel
         {
             Title = result.Value.Title,
             Description = result.Value.Description,
-            Body = result.Value.Body
+            Body = result.Value.Body,
+            BookmarkIds = [.. result.Value.BookmarkIds],
+            AttachmentIds = [.. result.Value.AttachmentIds]
         };
+
+        await LoadAssociationOptionsAsync(cancellationToken);
         return Page();
     }
 
@@ -38,6 +48,7 @@ public class EditModel(INotesApiClient notesApiClient) : PageModel
     {
         if (!ModelState.IsValid)
         {
+            await LoadAssociationOptionsAsync(cancellationToken);
             return Page();
         }
 
@@ -50,10 +61,30 @@ public class EditModel(INotesApiClient notesApiClient) : PageModel
                 ModelState.AddModelError(string.Empty, result.ToDisplayMessage("Could not update the note."));
             }
 
+            await LoadAssociationOptionsAsync(cancellationToken);
             return Page();
         }
 
         TempData["SuccessMessage"] = "Note updated.";
         return RedirectToPage("Index");
+    }
+
+    private async Task LoadAssociationOptionsAsync(CancellationToken cancellationToken)
+    {
+        var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
+        var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
+        await Task.WhenAll(bookmarksTask, attachmentsTask);
+
+        var bookmarksResult = await bookmarksTask;
+        if (bookmarksResult.IsSuccess)
+        {
+            AvailableBookmarks = bookmarksResult.Value ?? [];
+        }
+
+        var attachmentsResult = await attachmentsTask;
+        if (attachmentsResult.IsSuccess)
+        {
+            AvailableAttachments = attachmentsResult.Value ?? [];
+        }
     }
 }
