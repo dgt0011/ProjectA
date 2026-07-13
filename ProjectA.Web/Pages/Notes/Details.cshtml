@@ -1,0 +1,40 @@
+@page "{id:long}"
+@model ProjectA.Web.Pages.Notes.DetailsModel
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Note?.Title) ? "Note" : Model.Note.Title;
+}
+
+@if (Model.Note is null)
+{
+    <div class="alert alert-warning">Could not load this note from the API.</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h1>@(string.IsNullOrWhiteSpace(Model.Note.Title) ? "(untitled note)" : Model.Note.Title)</h1>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a asp-page="Edit" asp-route-id="@Model.Note.Id" class="btn btn-outline-secondary">Edit</a>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Note.Description))
+    {
+        <p class="lead text-muted">@Model.Note.Description</p>
+    }
+
+    <p class="text-muted small">
+        Last modified @((Model.Note.DateModified ?? Model.Note.DateCreated).ToLocalTime().ToString("g"))
+    </p>
+
+    <textarea id="note-body-raw" class="d-none">@Model.Note.Body</textarea>
+    <div id="note-body-rendered" class="border rounded p-3"></div>
+
+    <p class="mt-3">
+        <a asp-page="Index" class="btn btn-link ps-0">Back to Notes</a>
+    </p>
+}
+
+@section Scripts {
+    <partial name="_MarkdownViewerScripts" />
+}

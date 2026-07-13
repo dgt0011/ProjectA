@@ -38,7 +38,9 @@ else
             @foreach (var note in Model.Notes)
             {
                 <tr>
-                    <td>@note.Title</td>
+                    <td>
+                        <a asp-page="Details" asp-route-id="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</a>
+                    </td>
                     <td class="text-muted">@note.Description</td>
                     <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
                     @if (User.Identity?.IsAuthenticated == true)
