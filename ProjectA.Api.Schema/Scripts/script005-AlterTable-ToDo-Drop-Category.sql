@@ -3,4 +3,4 @@
 -- text values here - this project has no meaningful data to migrate, so the column is just
 -- dropped along with its now-orphaned index.
 DROP INDEX IF EXISTS idx1_todos;
-ALTER TABLE todos DROP COLUMN IF EXISTS category;
+-- ALTER TABLE todos DROP COLUMN IF EXISTS category;
