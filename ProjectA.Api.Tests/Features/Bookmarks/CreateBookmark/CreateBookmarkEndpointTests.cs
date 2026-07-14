@@ -42,7 +42,11 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
             new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM bookmarks WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
-        await connection.ExecuteAsync("DELETE FROM bookmark_types WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+        // Trailing space in the pattern matters here: "Create Test Bookmark%" would also
+        // match "Create Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
+        // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
+        // referenced by that other test's bookmark and trip the FK constraint on delete.
+        await connection.ExecuteAsync("DELETE FROM bookmark_types WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix} %" });
     }
 
     private async Task<long> SeedCategoryAsync(string suffix)

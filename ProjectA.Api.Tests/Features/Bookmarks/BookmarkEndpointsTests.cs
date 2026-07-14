@@ -45,9 +45,13 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         await connection.ExecuteAsync(
             "DELETE FROM categories WHERE title LIKE @Pattern;",
             new { Pattern = $"{TitlePrefix}%" });
+        // Trailing space in the pattern matters here: "List Test Bookmark%" would also match
+        // "List Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
+        // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
+        // referenced by that other test's bookmark and trip the FK constraint on delete.
         await connection.ExecuteAsync(
             "DELETE FROM bookmark_types WHERE title LIKE @Pattern;",
-            new { Pattern = $"{TitlePrefix}%" });
+            new { Pattern = $"{TitlePrefix} %" });
     }
 
     [Fact]
