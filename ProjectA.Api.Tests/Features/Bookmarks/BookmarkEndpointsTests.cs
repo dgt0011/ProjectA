@@ -45,7 +45,17 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         await connection.ExecuteAsync(
             "DELETE FROM categories WHERE title LIKE @Pattern;",
             new { Pattern = $"{TitlePrefix}%" });
-        // Trailing space in the pattern matters here: "List Test Bookmark%" would also match
+
+        // Unlike CategoryIds (a join table, cleared above regardless of the referencing
+        // bookmark's own title via the "OR category_id IN (...)" half of the bookmark_categories
+        // delete), BookmarkTypeId is a plain column on bookmarks - clearing it here, matched by
+        // bookmark_type_id rather than the referencing bookmark's title, guarantees the delete
+        // below never gets blocked by a bookmark whose title doesn't happen to match the pattern.
+        await connection.ExecuteAsync(
+            "UPDATE bookmarks SET bookmark_type_id = NULL WHERE bookmark_type_id IN " +
+            "(SELECT id FROM bookmark_types WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix} %" });
+        // Trailing space in the pattern matters here too: "List Test Bookmark%" would also match
         // "List Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
         // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
         // referenced by that other test's bookmark and trip the FK constraint on delete.

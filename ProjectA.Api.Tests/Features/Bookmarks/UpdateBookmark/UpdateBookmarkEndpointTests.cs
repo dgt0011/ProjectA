@@ -39,7 +39,21 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
             new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM bookmarks WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
-        // Trailing space in the pattern matters here: "Update Test Bookmark%" would also
+
+        // Unlike CategoryIds (a join table, cleared above via the "OR category_id IN (...)"
+        // half of the bookmark_categories delete regardless of the bookmark's own title),
+        // BookmarkTypeId is a plain column on bookmarks. UpdateBookmarkEndpoint overwrites
+        // Title unconditionally (no null-means-unchanged convention for it), so a test that
+        // PUTs a null Title wipes the bookmark's title to NULL - the "DELETE FROM bookmarks
+        // WHERE title LIKE" above then no longer matches that row, leaving it behind still
+        // pointing at a bookmark_type this cleanup is about to delete. Clearing the FK here,
+        // matched by bookmark_type_id rather than the referencing bookmark's title, is the
+        // only way to guarantee the delete below doesn't get blocked by a bookmark like that.
+        await connection.ExecuteAsync(
+            "UPDATE bookmarks SET bookmark_type_id = NULL WHERE bookmark_type_id IN " +
+            "(SELECT id FROM bookmark_types WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix} %" });
+        // Trailing space in the pattern matters here too: "Update Test Bookmark%" would also
         // match "Update Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
         // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
         // referenced by that other test's bookmark and trip the FK constraint on delete.
@@ -221,8 +235,12 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
         var bookmarkId = await SeedBookmarkAsync();
         var bookmarkTypeId = await SeedBookmarkTypeAsync("Github");
 
+        // Title is set explicitly (not null) so the bookmark's title still matches TitlePrefix
+        // after this update - UpdateBookmarkEndpoint overwrites Title unconditionally, so a
+        // null here would wipe it and leave this row unmatched by CleanUpAsync's title-based
+        // delete once BookmarkTypeId is set on it.
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/original", null, null, null, bookmarkTypeId, null);
+            "https://example.com/original", $"{TitlePrefix} Original", null, null, bookmarkTypeId, null);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
 
@@ -247,7 +265,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
         }
 
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/original", null, null, null, null, null);
+            "https://example.com/original", $"{TitlePrefix} Typed", null, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
 
