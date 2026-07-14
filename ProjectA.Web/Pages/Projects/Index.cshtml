@@ -38,7 +38,7 @@ else
             @foreach (var project in Model.Projects)
             {
                 <tr>
-                    <td>@project.Title</td>
+                    <td><a asp-page="Details" asp-route-id="@project.Id">@project.Title</a></td>
                     <td>@project.Description</td>
                     <td>@project.StartDate.ToString("yyyy-MM-dd")</td>
                     @if (User.Identity?.IsAuthenticated == true)

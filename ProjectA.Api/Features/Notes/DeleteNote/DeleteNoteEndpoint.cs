@@ -51,9 +51,11 @@ public static class DeleteNoteEndpoint
         {
             transaction.Rollback();
 
-            // project_notes is the only relationship that can still legitimately block
-            // deletion here - that's a Project referencing this note, the opposite direction
-            // from the three relationships exempted above.
+            // project_notes (a Project referencing this note) and any child note still
+            // pointing at this one via parent_note_id are the relationships that can still
+            // legitimately block deletion here - the opposite direction from the three
+            // relationships exempted above. A note with children has to be re-parented or
+            // have them deleted first, same as any other "referenced" entity in this API.
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Note is in use",

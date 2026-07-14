@@ -33,13 +33,29 @@ public static class CreateNoteEndpoint
             title = request.Title,
             description = request.Description,
             body = request.Body,
+            parent_note_id = request.ParentNoteId,
             date_created = DateTime.UtcNow
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = connection.BeginTransaction();
 
-        await connection.InsertAsync(entity, transaction);
+        // A brand-new note can't yet be anyone's ancestor (nothing points to it until after
+        // this insert), so ParentNoteId only needs the existence check the FK constraint
+        // already gives us - no cycle check needed here (unlike UpdateNoteEndpoint).
+        try
+        {
+            await connection.InsertAsync(entity, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.ParentNoteId)] = ["ParentNoteId does not refer to an existing note."]
+            });
+        }
 
         List<long> bookmarkIds;
         try
@@ -80,6 +96,7 @@ public static class CreateNoteEndpoint
             entity.title,
             entity.description,
             entity.body,
+            entity.parent_note_id,
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
@@ -109,6 +126,7 @@ public static class CreateNoteEndpoint
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
         IReadOnlyCollection<long>? BookmarkIds,
         IReadOnlyCollection<long>? AttachmentIds);
 
@@ -118,6 +136,7 @@ public static class CreateNoteEndpoint
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,

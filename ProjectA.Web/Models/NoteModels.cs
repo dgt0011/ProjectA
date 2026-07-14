@@ -8,6 +8,7 @@ public sealed class NoteDto
     public string? Title { get; set; }
     public string? Description { get; set; }
     public string? Body { get; set; }
+    public long? ParentNoteId { get; set; }
     public DateTime DateCreated { get; set; }
     public DateTime? DateModified { get; set; }
     public List<long> BookmarkIds { get; set; } = [];
@@ -31,6 +32,9 @@ public sealed class NoteInput : IValidatableObject
 
     public string? Body { get; set; }
 
+    [Display(Name = "Parent note")]
+    public long? ParentNoteId { get; set; }
+
     [Display(Name = "Bookmarks")]
     public List<long> BookmarkIds { get; set; } = [];
 
@@ -46,4 +50,17 @@ public sealed class NoteInput : IValidatableObject
             yield return new ValidationResult(message, [nameof(Body)]);
         }
     }
+}
+
+// View model for rendering one node of a Note's child hierarchy on the Details page. The
+// same ChildrenByParentId lookup (built once, up front, from the full notes list) is handed
+// down unchanged at every recursion depth so the _NoteTreeItem partial can look up its own
+// children without needing to re-fetch or re-filter anything.
+public sealed class NoteTreeItemViewModel
+{
+    public required NoteDto Note { get; init; }
+
+    public required IReadOnlyDictionary<long, List<NoteDto>> ChildrenByParentId { get; init; }
+
+    public int Depth { get; init; }
 }

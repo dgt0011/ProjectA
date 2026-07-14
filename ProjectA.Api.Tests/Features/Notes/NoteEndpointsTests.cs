@@ -138,4 +138,28 @@ public class NoteEndpointsTests : IAsyncLifetime
         Assert.Equal([bookmarkId], listItem.BookmarkIds);
         Assert.Equal([attachmentId], listItem.AttachmentIds);
     }
+
+    [Fact]
+    public async Task GetById_IncludesParentNoteId()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var parentId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} Parent" });
+        var childId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, parent_note_id) VALUES (@Title, @ParentNoteId) RETURNING id;",
+            new { Title = $"{TitlePrefix} Child", ParentNoteId = parentId });
+
+        var response = await _client.GetAsync($"/api/notes/{childId}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var note = await response.Content.ReadFromJsonAsync<GetNoteByIdEndpoint.NoteResponse>(JsonOptions);
+        Assert.NotNull(note);
+        Assert.Equal(parentId, note.ParentNoteId);
+
+        var listResponse = await _client.GetAsync("/api/notes");
+        var notes = await listResponse.Content.ReadFromJsonAsync<List<GetNoteListEndpoint.NoteListItemResponse>>(JsonOptions);
+        var listItem = notes!.Single(n => n.Id == childId);
+        Assert.Equal(parentId, listItem.ParentNoteId);
+    }
 }

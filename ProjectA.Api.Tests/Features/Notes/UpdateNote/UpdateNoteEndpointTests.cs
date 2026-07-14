@@ -58,7 +58,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithValidRequest_UpdatesAndReturnsOk()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", "Updated summary", "Updated body", null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", "Updated summary", "Updated body", null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -76,7 +76,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Missing", null, null, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Missing", null, null, null, null, null);
 
         var response = await _client.PutAsJsonAsync("/api/notes/999999", request, JsonOptions);
 
@@ -87,7 +87,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithNeitherTitleNorBody_ReturnsValidationProblem()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest(null, null, null, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest(null, null, null, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -109,7 +109,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
                 new { NoteId = id, BookmarkId = bookmarkId });
         }
 
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -134,7 +134,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
                 new { NoteId = id, BookmarkId = bookmarkId });
         }
 
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", [], null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, [], null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -149,10 +149,92 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithAttachmentIdThatDoesNotExist_ReturnsValidationProblem()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, [999999]);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, null, [999999]);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Put_WithParentNoteId_SetsParent()
+    {
+        var id = await SeedNoteAsync();
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var parentId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} Parent" });
+
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest(
+            $"{TitlePrefix} Updated", null, "Updated body", parentId, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateNoteEndpoint.NoteResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Equal(parentId, updated.ParentNoteId);
+    }
+
+    [Fact]
+    public async Task Put_WithParentNoteIdThatDoesNotExist_ReturnsValidationProblem()
+    {
+        var id = await SeedNoteAsync();
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest(
+            $"{TitlePrefix} Updated", null, "Updated body", 999999, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("ParentNoteId"));
+    }
+
+    [Fact]
+    public async Task Put_WithSelfAsParentNoteId_ReturnsValidationProblem()
+    {
+        var id = await SeedNoteAsync();
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", id, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("ParentNoteId"));
+    }
+
+    [Fact]
+    public async Task Put_WithDescendantAsParentNoteId_ReturnsValidationProblem()
+    {
+        // grandparent -> parent -> child, then try to make the grandparent a child of its
+        // own grandchild - that would create a cycle.
+        var grandparentId = await SeedNoteAsync();
+
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var childId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, parent_note_id) VALUES (@Title, @ParentNoteId) RETURNING id;",
+            new { Title = $"{TitlePrefix} Child", ParentNoteId = grandparentId });
+
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest(
+            $"{TitlePrefix} Updated", null, "Updated body", childId, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/notes/{grandparentId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("ParentNoteId"));
+    }
+
+    private sealed record ValidationProblemResponse(
+        string? Type,
+        string? Title,
+        int? Status,
+        Dictionary<string, string[]> Errors);
 }

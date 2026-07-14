@@ -31,9 +31,26 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     private async Task CleanUpAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
+
         await connection.ExecuteAsync(
-            "DELETE FROM projects WHERE title LIKE @Pattern;",
+            "DELETE FROM project_notes WHERE " +
+            "project_id IN (SELECT id FROM projects WHERE title LIKE @Pattern) OR " +
+            "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern);",
             new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM project_bookmarks WHERE " +
+            "project_id IN (SELECT id FROM projects WHERE title LIKE @Pattern) OR " +
+            "bookmark_id IN (SELECT id FROM bookmarks WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM project_attachments WHERE " +
+            "project_id IN (SELECT id FROM projects WHERE title LIKE @Pattern) OR " +
+            "attachment_id IN (SELECT id FROM attachments WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync("DELETE FROM projects WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync("DELETE FROM notes WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync("DELETE FROM bookmarks WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync("DELETE FROM attachments WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
     }
 
     private async Task<long> SeedProjectAsync()
@@ -45,12 +62,36 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
             new { Title = $"{TitlePrefix} Original" });
     }
 
+    private async Task<long> SeedNoteAsync(string suffix)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        return await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} {suffix}" });
+    }
+
+    private async Task<long> SeedBookmarkAsync(string suffix)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        return await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title) VALUES ('https://example.com/x', @Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} {suffix}" });
+    }
+
+    private async Task LinkNoteAsync(long projectId, long noteId)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        await connection.ExecuteAsync(
+            "INSERT INTO project_notes (project_id, note_id) VALUES (@ProjectId, @NoteId);",
+            new { ProjectId = projectId, NoteId = noteId });
+    }
+
     [Fact]
     public async Task Put_WithValidRequest_UpdatesAndReturnsOk()
     {
         var id = await SeedProjectAsync();
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Updated", "Updated description", new DateTime(2026, 7, 4).Date);
+            $"{TitlePrefix} Updated", "Updated description", new DateTime(2026, 7, 4).Date, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
 
@@ -67,7 +108,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Missing", null, new DateTime(2026, 1, 1).Date);
+            $"{TitlePrefix} Missing", null, new DateTime(2026, 1, 1).Date, null, null, null);
 
         var response = await _client.PutAsJsonAsync("/api/projects/999999", request, JsonOptions);
 
@@ -78,10 +119,95 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     public async Task Put_WithMissingTitle_ReturnsValidationProblem()
     {
         var id = await SeedProjectAsync();
-        var request = new UpdateProjectEndpoint.UpdateProjectRequest(" ", null, new DateTime(2026, 1, 1).Date);
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(" ", null, new DateTime(2026, 1, 1).Date, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Put_WithNoteIds_ReplacesExistingAssociations()
+    {
+        var projectId = await SeedProjectAsync();
+        var oldNoteId = await SeedNoteAsync("Old");
+        var newNoteId = await SeedNoteAsync("New");
+        await LinkNoteAsync(projectId, oldNoteId);
+
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, [newNoteId], null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateProjectEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Equal([newNoteId], updated.NoteIds);
+    }
+
+    [Fact]
+    public async Task Put_WithoutAssociationIds_LeavesExistingAssociationsUnchanged()
+    {
+        var projectId = await SeedProjectAsync();
+        var noteId = await SeedNoteAsync("Untouched");
+        await LinkNoteAsync(projectId, noteId);
+
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, null, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateProjectEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Equal([noteId], updated.NoteIds);
+    }
+
+    [Fact]
+    public async Task Put_WithEmptyNoteIds_ClearsExistingAssociations()
+    {
+        var projectId = await SeedProjectAsync();
+        var noteId = await SeedNoteAsync("ToRemove");
+        await LinkNoteAsync(projectId, noteId);
+
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, [], null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateProjectEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Empty(updated.NoteIds);
+    }
+
+    [Fact]
+    public async Task Put_WithInvalidBookmarkId_ReturnsValidationProblem_AndLeavesProjectUnchanged()
+    {
+        var projectId = await SeedProjectAsync();
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(
+            $"{TitlePrefix} ShouldNotApply", null, new DateTime(2026, 1, 1).Date, null, [999999], null);
+
+        var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("BookmarkIds"));
+
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var title = await connection.QuerySingleAsync<string>(
+            "SELECT title FROM projects WHERE id = @Id;", new { Id = projectId });
+        Assert.Equal($"{TitlePrefix} Original", title);
+    }
+
+    private sealed record ValidationProblemResponse(
+        string? Type,
+        string? Title,
+        int? Status,
+        Dictionary<string, string[]> Errors);
 }

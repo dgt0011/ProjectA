@@ -1,0 +1,42 @@
+<script>
+    // Renders every child note's raw Markdown body (each sitting untouched in its own hidden
+    // .note-tree-body-raw textarea, matched to its .note-tree-body-rendered container by a
+    // shared data-note-id) the same safe way _MarkdownViewerScripts renders the main note's
+    // body: marked.parse() followed by DOMPurify.sanitize() before ever touching innerHTML.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof marked !== 'undefined') {
+            document.querySelectorAll('.note-tree-body-raw').forEach(function (rawTextarea) {
+                var noteId = rawTextarea.getAttribute('data-note-id');
+                var rendered = document.querySelector('.note-tree-body-rendered[data-note-id="' + noteId + '"]');
+                if (!rendered) {
+                    return;
+                }
+
+                var html = marked.parse(rawTextarea.value || '');
+                if (typeof DOMPurify !== 'undefined') {
+                    html = DOMPurify.sanitize(html);
+                }
+
+                rendered.innerHTML = html;
+            });
+        }
+
+        // Flips each collapse toggle button's +/- glyph in step with Bootstrap's own
+        // shown/hidden events, so the button always reflects the collapsed note's actual
+        // state (including when a note is collapsed by clicking its own toggle rather than
+        // some other element).
+        document.querySelectorAll('.note-collapse').forEach(function (collapseEl) {
+            var toggleButton = document.querySelector('[data-bs-target="#' + collapseEl.id + '"] .collapse-toggle-icon');
+            if (!toggleButton) {
+                return;
+            }
+
+            collapseEl.addEventListener('shown.bs.collapse', function () {
+                toggleButton.innerHTML = '&minus;';
+            });
+            collapseEl.addEventListener('hidden.bs.collapse', function () {
+                toggleButton.textContent = '+';
+            });
+        });
+    });
+</script>

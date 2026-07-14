@@ -16,6 +16,7 @@ public class CreateModel(
     [BindProperty]
     public NoteInput Form { get; set; } = new();
 
+    public List<NoteDto> AvailableParentNotes { get; set; } = [];
     public List<BookmarkDto> AvailableBookmarks { get; set; } = [];
     public List<AttachmentDto> AvailableAttachments { get; set; } = [];
 
@@ -51,9 +52,18 @@ public class CreateModel(
 
     private async Task LoadAssociationOptionsAsync(CancellationToken cancellationToken)
     {
+        var notesTask = notesApiClient.GetListAsync(cancellationToken);
         var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
         var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
-        await Task.WhenAll(bookmarksTask, attachmentsTask);
+        await Task.WhenAll(notesTask, bookmarksTask, attachmentsTask);
+
+        // A brand-new note can't yet be anyone's ancestor, so every existing note is a
+        // valid parent choice here (unlike Edit, which excludes self/descendants).
+        var notesResult = await notesTask;
+        if (notesResult.IsSuccess)
+        {
+            AvailableParentNotes = notesResult.Value ?? [];
+        }
 
         var bookmarksResult = await bookmarksTask;
         if (bookmarksResult.IsSuccess)

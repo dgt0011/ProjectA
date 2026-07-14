@@ -19,6 +19,7 @@ public class EditModel(
     [BindProperty]
     public NoteInput Form { get; set; } = new();
 
+    public List<NoteDto> AvailableParentNotes { get; set; } = [];
     public List<BookmarkDto> AvailableBookmarks { get; set; } = [];
     public List<AttachmentDto> AvailableAttachments { get; set; } = [];
 
@@ -36,6 +37,7 @@ public class EditModel(
             Title = result.Value.Title,
             Description = result.Value.Description,
             Body = result.Value.Body,
+            ParentNoteId = result.Value.ParentNoteId,
             BookmarkIds = [.. result.Value.BookmarkIds],
             AttachmentIds = [.. result.Value.AttachmentIds]
         };
@@ -71,9 +73,36 @@ public class EditModel(
 
     private async Task LoadAssociationOptionsAsync(CancellationToken cancellationToken)
     {
+        var notesTask = notesApiClient.GetListAsync(cancellationToken);
         var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
         var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
-        await Task.WhenAll(bookmarksTask, attachmentsTask);
+        await Task.WhenAll(notesTask, bookmarksTask, attachmentsTask);
+
+        var notesResult = await notesTask;
+        if (notesResult.IsSuccess)
+        {
+            var allNotes = notesResult.Value ?? [];
+
+            // Exclude this note itself and any of its descendants - the API rejects these
+            // as a ParentNoteId anyway (they'd create a cycle), but filtering them out of
+            // the dropdown here avoids offering choices that would just bounce back with a
+            // validation error.
+            var excluded = new HashSet<long> { Id };
+            var addedMore = true;
+            while (addedMore)
+            {
+                addedMore = false;
+                foreach (var note in allNotes)
+                {
+                    if (note.ParentNoteId is { } parentId && excluded.Contains(parentId) && excluded.Add(note.Id))
+                    {
+                        addedMore = true;
+                    }
+                }
+            }
+
+            AvailableParentNotes = allNotes.Where(note => !excluded.Contains(note.Id)).ToList();
+        }
 
         var bookmarksResult = await bookmarksTask;
         if (bookmarksResult.IsSuccess)

@@ -25,6 +25,12 @@ public class DetailsModel(
     public List<BookmarkDto> AssociatedBookmarks { get; set; } = [];
     public List<AttachmentDto> AssociatedAttachments { get; set; } = [];
 
+    // Built once from the full notes list so the recursive _NoteTreeItem partial can look up
+    // any note's direct children without re-fetching. Only Note's own descendants ever get
+    // rendered, but it's simplest to build the lookup for every note up front.
+    public IReadOnlyDictionary<long, List<NoteDto>> ChildrenByParentId { get; set; } =
+        new Dictionary<long, List<NoteDto>>();
+
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         var result = await notesApiClient.GetByIdAsync(Id, cancellationToken);
@@ -35,6 +41,16 @@ public class DetailsModel(
         }
 
         Note = result.Value;
+
+        var allNotesResult = await notesApiClient.GetListAsync(cancellationToken);
+        if (allNotesResult.IsSuccess)
+        {
+            ChildrenByParentId = (allNotesResult.Value ?? [])
+                .Where(note => note.ParentNoteId is not null)
+                .OrderBy(note => note.DateCreated)
+                .GroupBy(note => note.ParentNoteId!.Value)
+                .ToDictionary(group => group.Key, group => group.ToList());
+        }
 
         if (Note.BookmarkIds.Count > 0)
         {

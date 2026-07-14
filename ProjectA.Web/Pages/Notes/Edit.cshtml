@@ -25,6 +25,17 @@
         <span asp-validation-for="Form.Body" class="text-danger"></span>
     </div>
     <div class="mb-3">
+        <label asp-for="Form.ParentNoteId" class="form-label"></label>
+        <select asp-for="Form.ParentNoteId" class="form-select">
+            <option value="">(none)</option>
+            @foreach (var note in Model.AvailableParentNotes)
+            {
+                <option value="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</option>
+            }
+        </select>
+        <span asp-validation-for="Form.ParentNoteId" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
         <label asp-for="Form.BookmarkIds" class="form-label"></label>
         @if (Model.AvailableBookmarks.Count == 0)
         {

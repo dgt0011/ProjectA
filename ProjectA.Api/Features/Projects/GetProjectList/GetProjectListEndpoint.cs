@@ -23,12 +23,19 @@ public static class GetProjectListEndpoint
             using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
             var entities = await connection.GetAllAsync<ProjectDto>();
 
+            var noteIdsByProject = await ProjectNoteLinks.GetNoteIdsForAllProjectsAsync(connection, cancellationToken);
+            var bookmarkIdsByProject = await ProjectBookmarkLinks.GetBookmarkIdsForAllProjectsAsync(connection, cancellationToken);
+            var attachmentIdsByProject = await ProjectAttachmentLinks.GetAttachmentIdsForAllProjectsAsync(connection, cancellationToken);
+
             var items = entities
                 .Select(entity => new ProjectListItemResponse(
                     entity.id,
                     entity.title,
                     entity.description,
-                    entity.start_date))
+                    entity.start_date,
+                    noteIdsByProject[entity.id].ToList(),
+                    bookmarkIdsByProject[entity.id].ToList(),
+                    attachmentIdsByProject[entity.id].ToList()))
                 .ToList();
 
             return TypedResults.Ok(items);
@@ -41,5 +48,12 @@ public static class GetProjectListEndpoint
     }
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
-    public sealed record ProjectListItemResponse(long Id, string Title, string? Description, DateTime StartDate);
+    public sealed record ProjectListItemResponse(
+        long Id,
+        string Title,
+        string? Description,
+        DateTime StartDate,
+        IReadOnlyCollection<long> NoteIds,
+        IReadOnlyCollection<long> BookmarkIds,
+        IReadOnlyCollection<long> AttachmentIds);
 }

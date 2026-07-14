@@ -27,6 +27,8 @@
       <EmbeddedResource Include="Scripts\script006-AlterTable-Notes-Add-Description.sql" />
       <None Remove="Scripts\script007-CreateTable-BookmarkTypes.sql" />
       <EmbeddedResource Include="Scripts\script007-CreateTable-BookmarkTypes.sql" />
+      <None Remove="Scripts\script008-AlterTable-Notes-Add-ParentNoteId.sql" />
+      <EmbeddedResource Include="Scripts\script008-AlterTable-Notes-Add-ParentNoteId.sql" />
     </ItemGroup>
 
 </Project>

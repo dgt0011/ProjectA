@@ -1,0 +1,54 @@
+@model ProjectA.Web.Models.NoteTreeItemViewModel
+@{
+    var note = Model.Note;
+    var children = Model.ChildrenByParentId.TryGetValue(note.Id, out var kids) ? kids : [];
+    var collapseId = $"note-collapse-{note.Id}";
+}
+
+@* Inset by Depth so nested children are visually indented under their parent, per the
+   "small distance" hierarchical layout requirement. Each node starts expanded (matching the
+   main note on the Details page) and can be individually collapsed down to just its Title,
+   Date Created and Date Modified via the toggle button. *@
+<div class="card mb-2" style="margin-left: @(Model.Depth * 24)px;">
+    <div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#@collapseId" aria-expanded="true" aria-controls="@collapseId">
+                    <span class="collapse-toggle-icon">&minus;</span>
+                </button>
+                <strong>@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</strong>
+            </div>
+            <span class="text-muted small">
+                Created @note.DateCreated.ToLocalTime().ToString("g")
+                @if (note.DateModified is { } modified)
+                {
+                    <text>&middot; Modified @modified.ToLocalTime().ToString("g")</text>
+                }
+            </span>
+        </div>
+
+        <div class="collapse show note-collapse mt-2" id="@collapseId">
+            @if (!string.IsNullOrWhiteSpace(note.Description))
+            {
+                <p class="text-muted mb-1">@note.Description</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(note.Body))
+            {
+                <textarea class="d-none note-tree-body-raw" data-note-id="@note.Id">@note.Body</textarea>
+                <div class="border rounded p-2 note-tree-body-rendered" data-note-id="@note.Id"></div>
+            }
+            <a asp-page="/Notes/Details" asp-route-id="@note.Id" class="small d-inline-block mt-1">Open as its own note</a>
+
+            @if (children.Count > 0)
+            {
+                <div class="mt-2">
+                    @foreach (var child in children)
+                    {
+                        <partial name="_NoteTreeItem" model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = Model.Depth + 1 })" />
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

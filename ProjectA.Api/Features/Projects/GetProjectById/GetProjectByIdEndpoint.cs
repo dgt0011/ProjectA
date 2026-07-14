@@ -26,7 +26,12 @@ public static class GetProjectByIdEndpoint
 
             if (entity is not null)
             {
-                var response = new ProjectResponse(entity.id, entity.title, entity.description, entity.start_date);
+                var noteIds = await ProjectNoteLinks.GetNoteIdsAsync(connection, entity.id, cancellationToken);
+                var bookmarkIds = await ProjectBookmarkLinks.GetBookmarkIdsAsync(connection, entity.id, cancellationToken);
+                var attachmentIds = await ProjectAttachmentLinks.GetAttachmentIdsAsync(connection, entity.id, cancellationToken);
+
+                var response = new ProjectResponse(
+                    entity.id, entity.title, entity.description, entity.start_date, noteIds, bookmarkIds, attachmentIds);
                 return TypedResults.Ok(response);
             }
         }
@@ -43,5 +48,12 @@ public static class GetProjectByIdEndpoint
     }
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
-    public sealed record ProjectResponse(long Id, string Title, string? Description, DateTime StartDate);
+    public sealed record ProjectResponse(
+        long Id,
+        string Title,
+        string? Description,
+        DateTime StartDate,
+        IReadOnlyCollection<long> NoteIds,
+        IReadOnlyCollection<long> BookmarkIds,
+        IReadOnlyCollection<long> AttachmentIds);
 }

@@ -47,12 +47,42 @@ public static class UpdateNoteEndpoint
             return notFound;
         }
 
+        // ParentNoteId is checked for cycles before it's ever handed to Postgres - the FK
+        // constraint alone guarantees the parent exists, but it has no way to know that
+        // "existing" parent isn't actually one of this note's own descendants, which would
+        // turn the tree into a loop.
+        if (request.ParentNoteId is { } parentNoteId &&
+            await NoteHierarchy.WouldCreateCycleAsync(connection, transaction, entity.id, parentNoteId, cancellationToken))
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.ParentNoteId)] = ["A note cannot be its own parent, or a descendant of itself."]
+            });
+        }
+
         entity.title = request.Title;
         entity.description = request.Description;
         entity.body = request.Body;
+        entity.parent_note_id = request.ParentNoteId;
         entity.date_modified = DateTime.UtcNow;
 
-        var updated = await connection.UpdateAsync(entity, transaction);
+        bool updated;
+        try
+        {
+            updated = await connection.UpdateAsync(entity, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.ParentNoteId)] = ["ParentNoteId does not refer to an existing note."]
+            });
+        }
+
         if (!updated)
         {
             transaction.Rollback();
@@ -102,6 +132,7 @@ public static class UpdateNoteEndpoint
             entity.title,
             entity.description,
             entity.body,
+            entity.parent_note_id,
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
@@ -124,11 +155,16 @@ public static class UpdateNoteEndpoint
         return errors;
     }
 
-    // Request body accepted by this endpoint - owned by this slice, not shared.
+    // Request body accepted by this endpoint - owned by this slice, not shared. ParentNoteId
+    // is a plain scalar (not a collection) so, like Title/Description/Body, it's always
+    // overwritten outright rather than following the CategoryIds/BookmarkIds/AttachmentIds
+    // "null means unchanged" convention - the Web form's dropdown always reflects the current
+    // selection, including "no parent".
     public sealed record UpdateNoteRequest(
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
         IReadOnlyCollection<long>? BookmarkIds,
         IReadOnlyCollection<long>? AttachmentIds);
 
@@ -138,6 +174,7 @@ public static class UpdateNoteEndpoint
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,

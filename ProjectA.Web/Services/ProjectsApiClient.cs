@@ -40,7 +40,16 @@ public sealed class ProjectsApiClient(HttpClient httpClient) : ApiClientBase(htt
         input.Description,
         input.StartDate is { } startDate
             ? DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
-            : null);
+            : null,
+        input.NoteIds,
+        input.BookmarkIds,
+        input.AttachmentIds);
 
-    private sealed record ProjectWireInput(string Title, string? Description, DateTime? StartDate);
+    private sealed record ProjectWireInput(
+        string Title,
+        string? Description,
+        DateTime? StartDate,
+        List<long> NoteIds,
+        List<long> BookmarkIds,
+        List<long> AttachmentIds);
 }

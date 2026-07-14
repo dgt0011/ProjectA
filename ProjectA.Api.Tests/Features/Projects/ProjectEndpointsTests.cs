@@ -32,8 +32,17 @@ public class ProjectEndpointsTests : IAsyncLifetime
     private async Task CleanUpAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        await connection.ExecuteAsync(
+            "DELETE FROM project_notes WHERE " +
+            "project_id IN (SELECT id FROM projects WHERE title LIKE @Pattern) OR " +
+            "note_id IN (SELECT id FROM notes WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync(
             "DELETE FROM projects WHERE title LIKE @Pattern;",
+            new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM notes WHERE title LIKE @Pattern;",
             new { Pattern = $"{TitlePrefix}%" });
     }
 
@@ -87,5 +96,52 @@ public class ProjectEndpointsTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task GetList_IncludesNoteAssociations()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var projectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-01-01') RETURNING id;",
+            new { Title = $"{TitlePrefix} ListAssociated" });
+        var noteId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListNote" });
+        await connection.ExecuteAsync(
+            "INSERT INTO project_notes (project_id, note_id) VALUES (@ProjectId, @NoteId);",
+            new { ProjectId = projectId, NoteId = noteId });
+
+        var response = await _client.GetAsync("/api/projects");
+        var projects = await response.Content
+            .ReadFromJsonAsync<List<GetProjectListEndpoint.ProjectListItemResponse>>(JsonOptions);
+        Assert.NotNull(projects);
+
+        var found = projects.Single(p => p.Id == projectId);
+        Assert.Equal([noteId], found.NoteIds);
+        Assert.Empty(found.BookmarkIds);
+        Assert.Empty(found.AttachmentIds);
+    }
+
+    [Fact]
+    public async Task GetById_IncludesNoteAssociations()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var projectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-01-01') RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdAssociated" });
+        var noteId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdNote" });
+        await connection.ExecuteAsync(
+            "INSERT INTO project_notes (project_id, note_id) VALUES (@ProjectId, @NoteId);",
+            new { ProjectId = projectId, NoteId = noteId });
+
+        var response = await _client.GetAsync($"/api/projects/{projectId}");
+        var project = await response.Content.ReadFromJsonAsync<GetProjectByIdEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(project);
+        Assert.Equal([noteId], project.NoteIds);
     }
 }

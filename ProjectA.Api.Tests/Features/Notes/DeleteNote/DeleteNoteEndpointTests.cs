@@ -113,6 +113,27 @@ public class DeleteNoteEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Delete_WhenHasChildNote_ReturnsConflict()
+    {
+        var parentId = await SeedNoteAsync("Parent");
+        using (var connection = await _connectionFactory.CreateConnectionAsync())
+        {
+            await connection.ExecuteAsync(
+                "INSERT INTO notes (title, parent_note_id) VALUES (@Title, @ParentNoteId);",
+                new { Title = $"{TitlePrefix} Child", ParentNoteId = parentId });
+        }
+
+        var response = await _client.DeleteAsync($"/api/notes/{parentId}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        // The parent must still exist since the delete was blocked.
+        var followUp = await _client.GetAsync($"/api/notes/{parentId}");
+        Assert.Equal(HttpStatusCode.OK, followUp.StatusCode);
+    }
+
+    [Fact]
     public async Task Delete_WhenHasCategoryAssociation_SucceedsAndLeavesCategoryIntact()
     {
         var noteId = await SeedNoteAsync("Categorized");
