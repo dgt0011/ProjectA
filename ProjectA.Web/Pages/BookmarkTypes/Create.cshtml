@@ -1,0 +1,37 @@
+@page
+@model ProjectA.Web.Pages.BookmarkTypes.CreateModel
+@{
+    ViewData["Title"] = "Create bookmark type";
+}
+
+<h1>Create bookmark type</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" enctype="multipart/form-data" class="col-md-6">
+    <div class="mb-3">
+        <label asp-for="Form.Title" class="form-label"></label>
+        <input asp-for="Form.Title" class="form-control" />
+        <span asp-validation-for="Form.Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Color" class="form-label"></label>
+        <div class="d-flex align-items-center gap-2">
+            <input type="color" class="form-control form-control-color" style="width: 3rem;"
+                   value="@(Model.Form.Color ?? "#6c757d")"
+                   oninput="document.getElementById('Form_Color').value = this.value;" />
+            <input asp-for="Form.Color" class="form-control" placeholder="#1A2B3C" style="max-width: 160px;" />
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('Form_Color').value = '';">Clear</button>
+        </div>
+        <div class="form-text">Optional - used as the row background color for this type in the Bookmarks list.</div>
+        <span asp-validation-for="Form.Color" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="IconFile" class="form-label">Icon</label>
+        <input asp-for="IconFile" class="form-control" accept="image/png,image/gif,image/jpeg,image/webp,image/x-icon" />
+        <div class="form-text">Optional - a small icon (e.g. 16x16 PNG or GIF) shown next to this type's bookmarks.</div>
+        <span asp-validation-for="Form.IconBase64" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-page="Index" class="btn btn-link">Cancel</a>
+</form>

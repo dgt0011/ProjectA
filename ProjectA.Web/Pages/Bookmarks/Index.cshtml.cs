@@ -5,21 +5,31 @@ using ProjectA.Web.Services;
 
 namespace ProjectA.Web.Pages.Bookmarks;
 
-public class IndexModel(IBookmarksApiClient bookmarksApiClient, ICategoriesApiClient categoriesApiClient) : PageModel
+public class IndexModel(
+    IBookmarksApiClient bookmarksApiClient,
+    ICategoriesApiClient categoriesApiClient,
+    IBookmarkTypesApiClient bookmarkTypesApiClient) : PageModel
 {
     public List<BookmarkDto> Bookmarks { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
 
     private Dictionary<long, string> _categoryTitlesById = [];
+    private Dictionary<long, BookmarkTypeDto> _bookmarkTypesById = [];
 
     public string CategoryTitle(long categoryId) =>
         _categoryTitlesById.GetValueOrDefault(categoryId, $"#{categoryId}");
+
+    // Null when the bookmark has no BookmarkTypeId, or the type it referred to no longer
+    // exists - callers treat both cases the same way (no icon, no row color).
+    public BookmarkTypeDto? BookmarkType(long? bookmarkTypeId) =>
+        bookmarkTypeId is long id ? _bookmarkTypesById.GetValueOrDefault(id) : null;
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
         var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
-        await Task.WhenAll(bookmarksTask, categoriesTask);
+        var bookmarkTypesTask = bookmarkTypesApiClient.GetListAsync(cancellationToken);
+        await Task.WhenAll(bookmarksTask, categoriesTask, bookmarkTypesTask);
 
         var bookmarksResult = await bookmarksTask;
         if (bookmarksResult.IsSuccess)
@@ -35,6 +45,12 @@ public class IndexModel(IBookmarksApiClient bookmarksApiClient, ICategoriesApiCl
         if (categoriesResult.IsSuccess)
         {
             _categoryTitlesById = (categoriesResult.Value ?? []).ToDictionary(category => category.Id, category => category.Title);
+        }
+
+        var bookmarkTypesResult = await bookmarkTypesTask;
+        if (bookmarkTypesResult.IsSuccess)
+        {
+            _bookmarkTypesById = (bookmarkTypesResult.Value ?? []).ToDictionary(bookmarkType => bookmarkType.Id);
         }
     }
 

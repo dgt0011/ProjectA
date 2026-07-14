@@ -45,6 +45,9 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         await connection.ExecuteAsync(
             "DELETE FROM categories WHERE title LIKE @Pattern;",
             new { Pattern = $"{TitlePrefix}%" });
+        await connection.ExecuteAsync(
+            "DELETE FROM bookmark_types WHERE title LIKE @Pattern;",
+            new { Pattern = $"{TitlePrefix}%" });
     }
 
     [Fact]
@@ -72,6 +75,29 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         Assert.Contains(seeded, b => b.Title == $"{TitlePrefix} A" && b.Rating == 5);
         Assert.Contains(seeded, b => b.Title == $"{TitlePrefix} B" && b.Rating == 1);
         Assert.All(seeded, b => Assert.Empty(b.CategoryIds));
+        Assert.All(seeded, b => Assert.Null(b.BookmarkTypeId));
+    }
+
+    [Fact]
+    public async Task GetList_IncludesBookmarkTypeId()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var bookmarkTypeId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmark_types (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListType" });
+        var bookmarkId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title, bookmark_type_id) VALUES " +
+            "('https://example.com/list-typed', @Title, @BookmarkTypeId) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListTyped", BookmarkTypeId = bookmarkTypeId });
+
+        var response = await _client.GetAsync("/api/bookmarks");
+        var bookmarks = await response.Content
+            .ReadFromJsonAsync<List<GetBookmarkListEndpoint.BookmarkListItemResponse>>(JsonOptions);
+        Assert.NotNull(bookmarks);
+
+        var found = bookmarks.Single(b => b.Id == bookmarkId);
+        Assert.Equal(bookmarkTypeId, found.BookmarkTypeId);
     }
 
     [Fact]
@@ -117,6 +143,27 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         Assert.Equal("https://example.com/byid", bookmark.Url);
         Assert.Equal(7, bookmark.Rating);
         Assert.Empty(bookmark.CategoryIds);
+        Assert.Null(bookmark.BookmarkTypeId);
+    }
+
+    [Fact]
+    public async Task GetById_IncludesBookmarkTypeId()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var bookmarkTypeId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmark_types (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdType" });
+        var bookmarkId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title, bookmark_type_id) VALUES " +
+            "('https://example.com/byid-typed', @Title, @BookmarkTypeId) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdTyped", BookmarkTypeId = bookmarkTypeId });
+
+        var response = await _client.GetAsync($"/api/bookmarks/{bookmarkId}");
+        var bookmark = await response.Content
+            .ReadFromJsonAsync<GetBookmarkByIdEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(bookmark);
+        Assert.Equal(bookmarkTypeId, bookmark.BookmarkTypeId);
     }
 
     [Fact]

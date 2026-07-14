@@ -1,0 +1,69 @@
+@page
+@model ProjectA.Web.Pages.BookmarkTypes.IndexModel
+@{
+    ViewData["Title"] = "Bookmark Types";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Bookmark Types</h1>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-page="Create" class="btn btn-primary">Create bookmark type</a>
+    }
+</div>
+
+@if (!Model.LoadedSuccessfully)
+{
+    <div class="alert alert-warning">Could not load bookmark types from the API.</div>
+}
+else if (Model.BookmarkTypes.Count == 0)
+{
+    <p class="text-muted">No bookmark types yet.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Icon</th>
+                <th>Title</th>
+                <th>Color</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var bookmarkType in Model.BookmarkTypes)
+            {
+                <tr>
+                    <td>
+                        @if (bookmarkType.HasIcon)
+                        {
+                            <img src="/bookmark-types/@bookmarkType.Id/icon" alt="" width="16" height="16" />
+                        }
+                    </td>
+                    <td>@bookmarkType.Title</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(bookmarkType.Color))
+                        {
+                            <span class="d-inline-block rounded border" style="width: 1rem; height: 1rem; background-color: @bookmarkType.Color; vertical-align: text-bottom;"></span>
+                            <span class="ms-1">@bookmarkType.Color</span>
+                        }
+                    </td>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
+                            <a asp-page="Edit" asp-route-id="@bookmarkType.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@bookmarkType.Id" class="d-inline"
+                                  onsubmit="return confirm('Delete this bookmark type?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}

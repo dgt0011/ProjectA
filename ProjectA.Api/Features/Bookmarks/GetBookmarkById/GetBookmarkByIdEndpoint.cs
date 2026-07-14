@@ -34,6 +34,7 @@ public static class GetBookmarkByIdEndpoint
                     entity.title,
                     entity.description,
                     entity.rating,
+                    entity.bookmark_type_id,
                     entity.date_created,
                     entity.date_modified,
                     categoryIds);
@@ -60,6 +61,7 @@ public static class GetBookmarkByIdEndpoint
         string? Title,
         string? Description,
         int Rating,
+        long? BookmarkTypeId,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> CategoryIds);

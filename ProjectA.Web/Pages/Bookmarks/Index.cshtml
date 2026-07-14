@@ -25,6 +25,7 @@ else
     <table class="table table-striped align-middle">
         <thead>
             <tr>
+                <th></th>
                 <th>Title</th>
                 <th>Url</th>
                 <th>Rating</th>
@@ -38,7 +39,14 @@ else
         <tbody>
             @foreach (var bookmark in Model.Bookmarks)
             {
-                <tr>
+                var bookmarkType = Model.BookmarkType(bookmark.BookmarkTypeId);
+                <tr style="@(!string.IsNullOrWhiteSpace(bookmarkType?.Color) ? $"background-color: {bookmarkType.Color};" : "")">
+                    <td>
+                        @if (bookmarkType is { HasIcon: true })
+                        {
+                            <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16" title="@bookmarkType.Title" />
+                        }
+                    </td>
                     <td>@bookmark.Title</td>
                     <td class="text-break"><a href="@bookmark.Url" target="_blank" rel="noopener">@bookmark.Url</a></td>
                     <td>

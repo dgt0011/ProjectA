@@ -30,6 +30,24 @@
         <span asp-validation-for="Form.Rating" class="text-danger"></span>
     </div>
     <div class="mb-3">
+        <label asp-for="Form.BookmarkTypeId" class="form-label"></label>
+        @if (Model.AvailableBookmarkTypes.Count == 0)
+        {
+            <p class="text-muted">No bookmark types exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.BookmarkTypeId" class="form-select">
+                <option value="">(none)</option>
+                @foreach (var bookmarkType in Model.AvailableBookmarkTypes)
+                {
+                    <option value="@bookmarkType.Id">@bookmarkType.Title</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.BookmarkTypeId" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
         <label asp-for="Form.CategoryIds" class="form-label"></label>
         @if (Model.AvailableCategories.Count == 0)
         {

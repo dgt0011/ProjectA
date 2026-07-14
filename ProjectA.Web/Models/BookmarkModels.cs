@@ -9,6 +9,7 @@ public sealed class BookmarkDto
     public string? Title { get; set; }
     public string? Description { get; set; }
     public int Rating { get; set; }
+    public long? BookmarkTypeId { get; set; }
     public DateTime DateCreated { get; set; }
     public DateTime? DateModified { get; set; }
     public List<long> CategoryIds { get; set; } = [];
@@ -32,6 +33,9 @@ public sealed class BookmarkInput
 
     [Range(1, 10, ErrorMessage = "Rating must be between 1 and 10.")]
     public int Rating { get; set; } = 1;
+
+    [Display(Name = "Bookmark Type")]
+    public long? BookmarkTypeId { get; set; }
 
     [Display(Name = "Categories")]
     public List<long> CategoryIds { get; set; } = [];

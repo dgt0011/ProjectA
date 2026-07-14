@@ -53,6 +53,10 @@ builder.Services.AddHttpClient<IBookmarksApiClient, BookmarksApiClient>(client =
 {
     client.BaseAddress = new Uri(apiBaseUrl);
 }).AddHttpMessageHandler<BearerTokenHandler>();
+builder.Services.AddHttpClient<IBookmarkTypesApiClient, BookmarkTypesApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+}).AddHttpMessageHandler<BearerTokenHandler>();
 builder.Services.AddHttpClient<IAttachmentsApiClient, AttachmentsApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
@@ -91,5 +95,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
+
+// The browser renders <img> tags directly against this Web app (it can never call
+// ProjectA.Api itself - there's no shared auth between the two beyond this server-to-server
+// BearerTokenHandler), so bookmark type icons need a small proxy route here rather than
+// pointing <img src> straight at the API.
+app.MapGet("/bookmark-types/{id:long}/icon", async (long id, IBookmarkTypesApiClient client, CancellationToken cancellationToken) =>
+{
+    var icon = await client.GetIconAsync(id, cancellationToken);
+    return icon is null ? Results.NotFound() : Results.File(icon.Bytes, icon.ContentType);
+});
 
 app.Run();
