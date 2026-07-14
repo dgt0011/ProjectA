@@ -11,7 +11,8 @@ public static class UpdateProjectEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateProject")
             .WithSummary("Update a project")
-            .WithDescription("Replaces an existing project's title, description and start date.");
+            .WithDescription("Replaces an existing project's title, description and start date.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<ProjectResponse>, ValidationProblem, ProblemHttpResult>> Handle(

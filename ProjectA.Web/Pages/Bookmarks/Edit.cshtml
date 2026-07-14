@@ -1,0 +1,70 @@
+@page "{id:long}"
+@model ProjectA.Web.Pages.Bookmarks.EditModel
+@{
+    ViewData["Title"] = "Edit bookmark";
+}
+
+<h1>Edit bookmark</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" class="col-md-6">
+    <div class="mb-3">
+        <label asp-for="Form.Url" class="form-label"></label>
+        <input asp-for="Form.Url" class="form-control" />
+        <span asp-validation-for="Form.Url" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Title" class="form-label"></label>
+        <input asp-for="Form.Title" class="form-control" />
+        <span asp-validation-for="Form.Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Description" class="form-label"></label>
+        <textarea asp-for="Form.Description" class="form-control"></textarea>
+        <span asp-validation-for="Form.Description" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Rating" class="form-label"></label>
+        <input asp-for="Form.Rating" class="form-control" type="number" min="1" max="10" />
+        <span asp-validation-for="Form.Rating" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.BookmarkTypeId" class="form-label"></label>
+        @if (Model.AvailableBookmarkTypes.Count == 0)
+        {
+            <p class="text-muted">No bookmark types exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.BookmarkTypeId" class="form-select">
+                <option value="">(none)</option>
+                @foreach (var bookmarkType in Model.AvailableBookmarkTypes)
+                {
+                    <option value="@bookmarkType.Id">@bookmarkType.Title</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.BookmarkTypeId" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.CategoryIds" class="form-label"></label>
+        @if (Model.AvailableCategories.Count == 0)
+        {
+            <p class="text-muted">No categories exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.CategoryIds" class="form-select" multiple size="@Math.Min(Model.AvailableCategories.Count, 6)">
+                @foreach (var category in Model.AvailableCategories)
+                {
+                    <option value="@category.Id">@category.Title</option>
+                }
+            </select>
+            <div class="form-text">Usually just one - hold Ctrl (Windows) or Cmd (Mac) and click to select more than one.</div>
+        }
+        <span asp-validation-for="Form.CategoryIds" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-page="Index" class="btn btn-link">Cancel</a>
+</form>

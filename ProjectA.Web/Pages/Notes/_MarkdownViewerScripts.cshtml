@@ -1,0 +1,24 @@
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script>
+    // Renders the note's raw Markdown (sitting untouched in the hidden #note-body-raw
+    // textarea - a textarea's content is never HTML-parsed, so this is a safe way to hand
+    // arbitrary Markdown/text to script regardless of what characters it contains) into the
+    // #note-body-rendered container. DOMPurify strips anything marked's output that could
+    // execute script (raw <script> tags, event handler attributes, etc.) before it's ever
+    // assigned to innerHTML.
+    document.addEventListener('DOMContentLoaded', function () {
+        var rawTextarea = document.getElementById('note-body-raw');
+        var rendered = document.getElementById('note-body-rendered');
+        if (!rawTextarea || !rendered || typeof marked === 'undefined') {
+            return;
+        }
+
+        var html = marked.parse(rawTextarea.value || '');
+        if (typeof DOMPurify !== 'undefined') {
+            html = DOMPurify.sanitize(html);
+        }
+
+        rendered.innerHTML = html;
+    });
+</script>

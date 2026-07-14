@@ -22,7 +22,7 @@ public class BookmarkEndpointsTests : IAsyncLifetime
 
     public BookmarkEndpointsTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
@@ -45,6 +45,23 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         await connection.ExecuteAsync(
             "DELETE FROM categories WHERE title LIKE @Pattern;",
             new { Pattern = $"{TitlePrefix}%" });
+
+        // Unlike CategoryIds (a join table, cleared above regardless of the referencing
+        // bookmark's own title via the "OR category_id IN (...)" half of the bookmark_categories
+        // delete), BookmarkTypeId is a plain column on bookmarks - clearing it here, matched by
+        // bookmark_type_id rather than the referencing bookmark's title, guarantees the delete
+        // below never gets blocked by a bookmark whose title doesn't happen to match the pattern.
+        await connection.ExecuteAsync(
+            "UPDATE bookmarks SET bookmark_type_id = NULL WHERE bookmark_type_id IN " +
+            "(SELECT id FROM bookmark_types WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix} %" });
+        // Trailing space in the pattern matters here too: "List Test Bookmark%" would also match
+        // "List Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
+        // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
+        // referenced by that other test's bookmark and trip the FK constraint on delete.
+        await connection.ExecuteAsync(
+            "DELETE FROM bookmark_types WHERE title LIKE @Pattern;",
+            new { Pattern = $"{TitlePrefix} %" });
     }
 
     [Fact]
@@ -72,6 +89,29 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         Assert.Contains(seeded, b => b.Title == $"{TitlePrefix} A" && b.Rating == 5);
         Assert.Contains(seeded, b => b.Title == $"{TitlePrefix} B" && b.Rating == 1);
         Assert.All(seeded, b => Assert.Empty(b.CategoryIds));
+        Assert.All(seeded, b => Assert.Null(b.BookmarkTypeId));
+    }
+
+    [Fact]
+    public async Task GetList_IncludesBookmarkTypeId()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var bookmarkTypeId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmark_types (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListType" });
+        var bookmarkId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title, bookmark_type_id) VALUES " +
+            "('https://example.com/list-typed', @Title, @BookmarkTypeId) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListTyped", BookmarkTypeId = bookmarkTypeId });
+
+        var response = await _client.GetAsync("/api/bookmarks");
+        var bookmarks = await response.Content
+            .ReadFromJsonAsync<List<GetBookmarkListEndpoint.BookmarkListItemResponse>>(JsonOptions);
+        Assert.NotNull(bookmarks);
+
+        var found = bookmarks.Single(b => b.Id == bookmarkId);
+        Assert.Equal(bookmarkTypeId, found.BookmarkTypeId);
     }
 
     [Fact]
@@ -117,6 +157,27 @@ public class BookmarkEndpointsTests : IAsyncLifetime
         Assert.Equal("https://example.com/byid", bookmark.Url);
         Assert.Equal(7, bookmark.Rating);
         Assert.Empty(bookmark.CategoryIds);
+        Assert.Null(bookmark.BookmarkTypeId);
+    }
+
+    [Fact]
+    public async Task GetById_IncludesBookmarkTypeId()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var bookmarkTypeId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmark_types (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdType" });
+        var bookmarkId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmarks (url, title, bookmark_type_id) VALUES " +
+            "('https://example.com/byid-typed', @Title, @BookmarkTypeId) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdTyped", BookmarkTypeId = bookmarkTypeId });
+
+        var response = await _client.GetAsync($"/api/bookmarks/{bookmarkId}");
+        var bookmark = await response.Content
+            .ReadFromJsonAsync<GetBookmarkByIdEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(bookmark);
+        Assert.Equal(bookmarkTypeId, bookmark.BookmarkTypeId);
     }
 
     [Fact]

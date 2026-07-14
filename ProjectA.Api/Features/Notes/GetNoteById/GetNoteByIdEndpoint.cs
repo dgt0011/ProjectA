@@ -26,12 +26,18 @@ public static class GetNoteByIdEndpoint
 
             if (entity is not null)
             {
+                var bookmarkIds = await NoteBookmarkLinks.GetBookmarkIdsAsync(connection, entity.id, cancellationToken);
+                var attachmentIds = await NoteAttachmentLinks.GetAttachmentIdsAsync(connection, entity.id, cancellationToken);
+
                 var response = new NoteResponse(
                     entity.id,
                     entity.title,
+                    entity.description,
                     entity.body,
                     entity.date_created,
-                    entity.date_modified);
+                    entity.date_modified,
+                    bookmarkIds,
+                    attachmentIds);
 
                 return TypedResults.Ok(response);
             }
@@ -52,7 +58,10 @@ public static class GetNoteByIdEndpoint
     public sealed record NoteResponse(
         long Id,
         string? Title,
+        string? Description,
         string? Body,
         DateTime DateCreated,
-        DateTime? DateModified);
+        DateTime? DateModified,
+        IReadOnlyCollection<long> BookmarkIds,
+        IReadOnlyCollection<long> AttachmentIds);
 }

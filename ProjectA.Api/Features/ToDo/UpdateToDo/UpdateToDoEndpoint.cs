@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.ToDo.UpdateToDo;
@@ -11,7 +12,8 @@ public static class UpdateToDoEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateToDo")
             .WithSummary("Update a ToDo")
-            .WithDescription("Replaces an existing ToDo's title, category, description and completion state.");
+            .WithDescription("Replaces an existing ToDo's title, category, description and completion state.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<ToDoResponse>, ValidationProblem, ProblemHttpResult>> Handle(
@@ -44,12 +46,24 @@ public static class UpdateToDoEndpoint
         }
 
         entity.title = request.Title;
-        entity.category = request.Category;
+        entity.category_id = request.CategoryId;
         entity.description = request.Description;
         entity.actioned = request.Done;
         entity.date_modified = DateTime.UtcNow;
 
-        var updated = await connection.UpdateAsync(entity);
+        bool updated;
+        try
+        {
+            updated = await connection.UpdateAsync(entity);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryId)] = ["CategoryId does not refer to an existing category."]
+            });
+        }
+
         if (!updated)
         {
             // Row was deleted between the read above and this write.
@@ -58,7 +72,7 @@ public static class UpdateToDoEndpoint
 
         var response = new ToDoResponse(
             entity.id,
-            entity.category,
+            entity.category_id,
             entity.title,
             entity.description,
             entity.date_created,
@@ -77,21 +91,21 @@ public static class UpdateToDoEndpoint
             errors[nameof(request.Title)] = ["Title is required."];
         }
 
-        if (string.IsNullOrWhiteSpace(request.Category))
+        if (request.CategoryId is null)
         {
-            errors[nameof(request.Category)] = ["Category is required."];
+            errors[nameof(request.CategoryId)] = ["CategoryId is required."];
         }
 
         return errors;
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateToDoRequest(string Title, string Category, string? Description, bool Done);
+    public sealed record UpdateToDoRequest(string Title, long? CategoryId, string? Description, bool Done);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record ToDoResponse(
         long Id,
-        string Category,
+        long? CategoryId,
         string Title,
         string? Description,
         DateTime? DateCreated,

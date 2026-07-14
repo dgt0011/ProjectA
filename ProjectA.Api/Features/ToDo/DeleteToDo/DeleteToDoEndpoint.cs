@@ -11,7 +11,8 @@ public static class DeleteToDoEndpoint
         group.MapDelete("{id}", Handle)
             .WithName("DeleteToDo")
             .WithSummary("Delete a ToDo")
-            .WithDescription("Permanently removes a ToDo by Id.");
+            .WithDescription("Permanently removes a ToDo by Id.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(

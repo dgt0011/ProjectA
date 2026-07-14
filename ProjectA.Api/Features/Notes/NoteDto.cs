@@ -12,6 +12,7 @@ internal sealed class NoteDto
     [Dapper.Contrib.Extensions.Key]
     public long id { get; init; }
     public string? title { get; set; }
+    public string? description { get; set; }
     public string? body { get; set; }
     public DateTime date_created { get; init; }
     public DateTime? date_modified { get; set; }

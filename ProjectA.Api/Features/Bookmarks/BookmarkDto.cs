@@ -15,6 +15,7 @@ internal sealed class BookmarkDto
     public string? title { get; set; }
     public string? description { get; set; }
     public short rating { get; set; }
+    public long? bookmark_type_id { get; set; }
     public DateTime date_created { get; init; }
     public DateTime? date_modified { get; set; }
 }

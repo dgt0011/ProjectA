@@ -12,7 +12,8 @@ public static class DeleteAttachmentEndpoint
         group.MapDelete("{id}", Handle)
             .WithName("DeleteAttachment")
             .WithSummary("Delete an attachment")
-            .WithDescription("Permanently removes an attachment by Id.");
+            .WithDescription("Permanently removes an attachment by Id.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(

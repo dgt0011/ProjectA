@@ -14,8 +14,10 @@ public static class DeleteNoteEndpoint
             .WithName("DeleteNote")
             .WithSummary("Delete a note")
             .WithDescription(
-                "Permanently removes a note by Id. Any category associations for this note " +
-                "are removed too, but the categories themselves are never touched.");
+                "Permanently removes a note by Id. Any category, bookmark and attachment " +
+                "associations for this note are removed too, but the categories, bookmarks " +
+                "and attachments themselves are never touched.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(
@@ -29,15 +31,19 @@ public static class DeleteNoteEndpoint
         bool deleted;
         try
         {
-            // A note's Category associations should never block, or be affected by, deleting
-            // the note - only this note's note_categories rows are cleared here; the
-            // categories themselves are never touched. (There's no dedicated Note<->Category
-            // management endpoint yet - this just guards against rows already in that table.)
+            // A note's Category, Bookmark and Attachment associations should never block, or
+            // be affected by, deleting the note - the note is the "owning" side of all three
+            // relationships (same direction as a bookmark owning bookmark_categories), so only
+            // this note's own join rows are cleared here; the categories/bookmarks/attachments
+            // themselves are never touched.
             await connection.ExecuteAsync(new CommandDefinition(
                 "DELETE FROM note_categories WHERE note_id = @NoteId;",
                 new { NoteId = (long)id },
                 transaction,
                 cancellationToken: cancellationToken));
+
+            await NoteBookmarkLinks.ReplaceAsync(connection, transaction, (long)id, bookmarkIds: null, cancellationToken);
+            await NoteAttachmentLinks.ReplaceAsync(connection, transaction, (long)id, attachmentIds: null, cancellationToken);
 
             deleted = await connection.DeleteAsync(new NoteDto { id = (long)id }, transaction);
         }
@@ -45,8 +51,9 @@ public static class DeleteNoteEndpoint
         {
             transaction.Rollback();
 
-            // note_bookmarks, note_attachments and project_notes can still legitimately
-            // block deletion - only the category relationship is exempted above.
+            // project_notes is the only relationship that can still legitimately block
+            // deletion here - that's a Project referencing this note, the opposite direction
+            // from the three relationships exempted above.
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Note is in use",

@@ -9,36 +9,49 @@ namespace ProjectA.Api.Tests.Features.ToDo.DeleteToDo;
 [Collection(nameof(ApiCollection))]
 public class DeleteToDoEndpointTests : IAsyncLifetime
 {
-    private const string TestCategory = "Delete Test Category";
+    private const string TestCategoryTitle = "Delete Test Category";
     private const string LinkedCategoryTitle = "Delete Test Category For ToDo";
 
     private readonly HttpClient _client;
     private readonly IDbConnectionFactory _connectionFactory;
+    private long _categoryId;
 
     public DeleteToDoEndpointTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
-    public async Task InitializeAsync() => await CleanUpAsync();
+    public async Task InitializeAsync()
+    {
+        await CleanUpAsync();
+
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        _categoryId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
+            new { Title = TestCategoryTitle });
+    }
 
     public async Task DisposeAsync() => await CleanUpAsync();
 
     private async Task CleanUpAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
-        await connection.ExecuteAsync("DELETE FROM todos WHERE category = @Category;", new { Category = TestCategory });
-        await connection.ExecuteAsync("DELETE FROM categories WHERE title = @Title;", new { Title = LinkedCategoryTitle });
+        await connection.ExecuteAsync(
+            "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title IN (@TestCategoryTitle, @LinkedCategoryTitle));",
+            new { TestCategoryTitle, LinkedCategoryTitle });
+        await connection.ExecuteAsync(
+            "DELETE FROM categories WHERE title IN (@TestCategoryTitle, @LinkedCategoryTitle);",
+            new { TestCategoryTitle, LinkedCategoryTitle });
     }
 
     private async Task<long> SeedToDoAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         return await connection.QuerySingleAsync<long>(
-            "INSERT INTO todos (title, actioned, category, description, date_created) " +
-            "VALUES ('To be deleted', false, @Category, null, now()) RETURNING id;",
-            new { Category = TestCategory });
+            "INSERT INTO todos (title, actioned, category_id, description, date_created) " +
+            "VALUES ('To be deleted', false, @CategoryId, null, now()) RETURNING id;",
+            new { CategoryId = _categoryId });
     }
 
     [Fact]
@@ -78,9 +91,9 @@ public class DeleteToDoEndpointTests : IAsyncLifetime
                 new { Title = LinkedCategoryTitle });
 
             todoId = await connection.QuerySingleAsync<long>(
-                "INSERT INTO todos (title, actioned, category, category_id, date_created) " +
-                "VALUES ('To be deleted with category_id', false, @Category, @CategoryId, now()) RETURNING id;",
-                new { Category = TestCategory, CategoryId = categoryId });
+                "INSERT INTO todos (title, actioned, category_id, date_created) " +
+                "VALUES ('To be deleted with category_id', false, @CategoryId, now()) RETURNING id;",
+                new { CategoryId = categoryId });
         }
 
         var response = await _client.DeleteAsync($"/api/todo/{todoId}");

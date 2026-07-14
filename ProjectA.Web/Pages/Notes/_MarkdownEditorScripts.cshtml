@@ -1,0 +1,42 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+<script>
+    // Wires EasyMDE (a Markdown editor built on CodeMirror) onto the Body textarea. Its
+    // toolbar includes "Preview" (swap the editor for the rendered Markdown) and
+    // "Side by side" (edit and rendered preview shown together) - either satisfies "render
+    // the Markdown" without needing a custom WYSIWYG control here.
+    document.addEventListener('DOMContentLoaded', function () {
+        var textarea = document.getElementById('Form_Body');
+        if (!textarea || typeof EasyMDE === 'undefined') {
+            return;
+        }
+
+        var easyMDE = new EasyMDE({
+            element: textarea,
+            spellChecker: false,
+            status: false,
+            placeholder: 'Write the note body in Markdown...',
+            toolbar: [
+                'bold', 'italic', 'heading', '|',
+                'quote', 'unordered-list', 'ordered-list', '|',
+                'link', 'image', '|',
+                'preview', 'side-by-side', 'fullscreen', '|',
+                'guide'
+            ]
+        });
+
+        // EasyMDE only writes into the original textarea when told to - keep it synced on
+        // every keystroke, and once more immediately before submit, so the standard Razor
+        // Pages form post for Form.Body always carries the latest Markdown text.
+        var syncBackToTextarea = function () {
+            textarea.value = easyMDE.value();
+        };
+
+        easyMDE.codemirror.on('change', syncBackToTextarea);
+
+        var form = textarea.closest('form');
+        if (form) {
+            form.addEventListener('submit', syncBackToTextarea);
+        }
+    });
+</script>

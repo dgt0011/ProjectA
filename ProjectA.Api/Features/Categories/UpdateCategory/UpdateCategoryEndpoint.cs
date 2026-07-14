@@ -11,7 +11,8 @@ public static class UpdateCategoryEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateCategory")
             .WithSummary("Update a category")
-            .WithDescription("Replaces an existing category's title and description.");
+            .WithDescription("Replaces an existing category's title and description.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<CategoryResponse>, ValidationProblem, ProblemHttpResult>> Handle(

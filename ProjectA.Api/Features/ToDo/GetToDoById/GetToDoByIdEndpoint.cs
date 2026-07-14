@@ -28,7 +28,7 @@ public static class GetToDoByIdEndpoint
             {
                 var response = new ToDoResponse(
                     entity.id,
-                    entity.category,
+                    entity.category_id,
                     entity.title,
                     entity.description,
                     entity.date_created,
@@ -53,7 +53,7 @@ public static class GetToDoByIdEndpoint
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record ToDoResponse(
         long Id,
-        string Category,
+        long? CategoryId,
         string Title,
         string? Description,
         DateTime? DateCreated,

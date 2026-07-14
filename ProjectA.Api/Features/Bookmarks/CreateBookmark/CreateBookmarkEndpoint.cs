@@ -12,7 +12,8 @@ public static class CreateBookmarkEndpoint
         group.MapPost("", Handle)
             .WithName("CreateBookmark")
             .WithSummary("Create a bookmark")
-            .WithDescription("Creates a new bookmark, optionally associating it with one or more categories.");
+            .WithDescription("Creates a new bookmark, optionally associating it with one or more categories.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<CreatedAtRoute<BookmarkResponse>, ValidationProblem>> Handle(
@@ -32,17 +33,34 @@ public static class CreateBookmarkEndpoint
             title = request.Title,
             description = request.Description,
             rating = (short)(request.Rating ?? 1),
+            bookmark_type_id = request.BookmarkTypeId,
             date_created = DateTime.UtcNow
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = connection.BeginTransaction();
 
-        List<long> categoryIds;
+        // Two separate try/catches (same convention as CreateNoteEndpoint's BookmarkIds vs.
+        // AttachmentIds): the insert itself is the only place a bad BookmarkTypeId can fail, so
+        // it's caught and attributed on its own rather than lumped in with the CategoryIds
+        // catch below.
         try
         {
             await connection.InsertAsync(entity, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
 
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.BookmarkTypeId)] = ["BookmarkTypeId does not refer to an existing bookmark type."]
+            });
+        }
+
+        List<long> categoryIds;
+        try
+        {
             // Same transaction as the insert above: if any CategoryId doesn't exist, the
             // whole create is rolled back rather than leaving an uncategorized bookmark behind.
             categoryIds = await BookmarkCategoryLinks.ReplaceAsync(
@@ -66,6 +84,7 @@ public static class CreateBookmarkEndpoint
             entity.title,
             entity.description,
             entity.rating,
+            entity.bookmark_type_id,
             entity.date_created,
             entity.date_modified,
             categoryIds);
@@ -96,6 +115,7 @@ public static class CreateBookmarkEndpoint
         string? Title,
         string? Description,
         int? Rating,
+        long? BookmarkTypeId,
         IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
@@ -105,6 +125,7 @@ public static class CreateBookmarkEndpoint
         string? Title,
         string? Description,
         int Rating,
+        long? BookmarkTypeId,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> CategoryIds);

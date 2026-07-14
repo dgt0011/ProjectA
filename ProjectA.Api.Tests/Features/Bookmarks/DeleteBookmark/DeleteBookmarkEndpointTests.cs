@@ -3,20 +3,23 @@ using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectA.Api.Data;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ProjectA.Api.Tests.Features.Bookmarks.DeleteBookmark;
 
 [Collection(nameof(ApiCollection))]
 public class DeleteBookmarkEndpointTests : IAsyncLifetime
 {
+    private readonly ITestOutputHelper _testOutputHelper;
     private const string TitlePrefix = "Delete Test Bookmark";
 
     private readonly HttpClient _client;
     private readonly IDbConnectionFactory _connectionFactory;
 
-    public DeleteBookmarkEndpointTests(ApiFactory factory)
+    public DeleteBookmarkEndpointTests(ApiFactory factory, ITestOutputHelper testOutputHelper)
     {
-        _client = factory.CreateClient();
+        _testOutputHelper = testOutputHelper;
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
@@ -71,6 +74,9 @@ public class DeleteBookmarkEndpointTests : IAsyncLifetime
     {
         var response = await _client.DeleteAsync("/api/bookmarks/999999");
 
+        //debuggery
+        _testOutputHelper.WriteLine(response.Headers.WwwAuthenticate.ToString());
+        
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }

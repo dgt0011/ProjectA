@@ -21,7 +21,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
 
     public CreateBookmarkEndpointTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
@@ -42,6 +42,21 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
             new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM bookmarks WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+
+        // Unlike CategoryIds (a join table, cleared above regardless of the referencing
+        // bookmark's own title via the "OR category_id IN (...)" half of the bookmark_categories
+        // delete), BookmarkTypeId is a plain column on bookmarks - clearing it here, matched by
+        // bookmark_type_id rather than the referencing bookmark's title, guarantees the delete
+        // below never gets blocked by a bookmark whose title doesn't happen to match the pattern.
+        await connection.ExecuteAsync(
+            "UPDATE bookmarks SET bookmark_type_id = NULL WHERE bookmark_type_id IN " +
+            "(SELECT id FROM bookmark_types WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix} %" });
+        // Trailing space in the pattern matters here too: "Create Test Bookmark%" would also
+        // match "Create Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
+        // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
+        // referenced by that other test's bookmark and trip the FK constraint on delete.
+        await connection.ExecuteAsync("DELETE FROM bookmark_types WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix} %" });
     }
 
     private async Task<long> SeedCategoryAsync(string suffix)
@@ -52,11 +67,19 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
             new { Title = $"{TitlePrefix} {suffix}" });
     }
 
+    private async Task<long> SeedBookmarkTypeAsync(string suffix)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        return await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmark_types (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} {suffix}" });
+    }
+
     [Fact]
     public async Task Post_WithValidRequest_CreatesBookmarkAndReturnsCreated()
     {
         var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
-            "https://example.com/new", $"{TitlePrefix} New", "A description", 8, null);
+            "https://example.com/new", $"{TitlePrefix} New", "A description", 8, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
 
@@ -76,7 +99,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
     public async Task Post_WithoutRating_DefaultsToOne()
     {
         var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
-            "https://example.com/default-rating", $"{TitlePrefix} DefaultRating", null, null, null);
+            "https://example.com/default-rating", $"{TitlePrefix} DefaultRating", null, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
 
@@ -90,7 +113,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithMissingUrl_ReturnsValidationProblem()
     {
-        var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(" ", null, null, null, null);
+        var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(" ", null, null, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
 
@@ -105,7 +128,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
     public async Task Post_WithOutOfRangeRating_ReturnsValidationProblem()
     {
         var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
-            "https://example.com/bad-rating", $"{TitlePrefix} BadRating", null, 11, null);
+            "https://example.com/bad-rating", $"{TitlePrefix} BadRating", null, 11, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
 
@@ -123,7 +146,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
         var categoryTwoId = await SeedCategoryAsync("Two");
 
         var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
-            "https://example.com/categorized", $"{TitlePrefix} Categorized", null, null,
+            "https://example.com/categorized", $"{TitlePrefix} Categorized", null, null, null,
             [categoryOneId, categoryTwoId]);
 
         var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
@@ -150,7 +173,7 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
     public async Task Post_WithInvalidCategoryId_ReturnsValidationProblem_AndCreatesNoBookmark()
     {
         var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
-            "https://example.com/bad-category", $"{TitlePrefix} BadCategory", null, null, [999999]);
+            "https://example.com/bad-category", $"{TitlePrefix} BadCategory", null, null, null, [999999]);
 
         var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
 
@@ -165,6 +188,50 @@ public class CreateBookmarkEndpointTests : IAsyncLifetime
         var count = await connection.QuerySingleAsync<long>(
             "SELECT COUNT(*) FROM bookmarks WHERE title = @Title;",
             new { Title = $"{TitlePrefix} BadCategory" });
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task Post_WithBookmarkTypeId_AssociatesBookmarkTypeAndReturnsIt()
+    {
+        var bookmarkTypeId = await SeedBookmarkTypeAsync("Github");
+
+        var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
+            "https://example.com/typed", $"{TitlePrefix} Typed", null, null, bookmarkTypeId, null);
+
+        var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var created = await response.Content.ReadFromJsonAsync<CreateBookmarkEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.Equal(bookmarkTypeId, created.BookmarkTypeId);
+
+        var getResponse = await _client.GetAsync($"/api/bookmarks/{created.Id}");
+        var fetched = await getResponse.Content
+            .ReadFromJsonAsync<GetBookmarkByIdEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(fetched);
+        Assert.Equal(bookmarkTypeId, fetched.BookmarkTypeId);
+    }
+
+    [Fact]
+    public async Task Post_WithInvalidBookmarkTypeId_ReturnsValidationProblem_AndCreatesNoBookmark()
+    {
+        var request = new CreateBookmarkEndpoint.CreateBookmarkRequest(
+            "https://example.com/bad-bookmark-type", $"{TitlePrefix} BadBookmarkType", null, null, 999999, null);
+
+        var response = await _client.PostAsJsonAsync("/api/bookmarks", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("BookmarkTypeId"));
+
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var count = await connection.QuerySingleAsync<long>(
+            "SELECT COUNT(*) FROM bookmarks WHERE title = @Title;",
+            new { Title = $"{TitlePrefix} BadBookmarkType" });
         Assert.Equal(0, count);
     }
 

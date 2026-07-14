@@ -20,7 +20,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
 
     public UpdateBookmarkEndpointTests(ApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
@@ -39,6 +39,33 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
             new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM bookmarks WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix}%" });
+
+        // Unlike CategoryIds (a join table, cleared above via the "OR category_id IN (...)"
+        // half of the bookmark_categories delete regardless of the bookmark's own title),
+        // BookmarkTypeId is a plain column on bookmarks. UpdateBookmarkEndpoint overwrites
+        // Title unconditionally (no null-means-unchanged convention for it), so a test that
+        // PUTs a null Title wipes the bookmark's title to NULL - the "DELETE FROM bookmarks
+        // WHERE title LIKE" above then no longer matches that row, leaving it behind still
+        // pointing at a bookmark_type this cleanup is about to delete. Clearing the FK here,
+        // matched by bookmark_type_id rather than the referencing bookmark's title, is the
+        // only way to guarantee the delete below doesn't get blocked by a bookmark like that.
+        await connection.ExecuteAsync(
+            "UPDATE bookmarks SET bookmark_type_id = NULL WHERE bookmark_type_id IN " +
+            "(SELECT id FROM bookmark_types WHERE title LIKE @Pattern);",
+            new { Pattern = $"{TitlePrefix} %" });
+        // Trailing space in the pattern matters here too: "Update Test Bookmark%" would also
+        // match "Update Test BookmarkType ..." rows seeded by the BookmarkTypes tests (since
+        // "Bookmark" is a literal string-prefix of "BookmarkType"), which could still be
+        // referenced by that other test's bookmark and trip the FK constraint on delete.
+        await connection.ExecuteAsync("DELETE FROM bookmark_types WHERE title LIKE @Pattern;", new { Pattern = $"{TitlePrefix} %" });
+    }
+
+    private async Task<long> SeedBookmarkTypeAsync(string suffix)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        return await connection.QuerySingleAsync<long>(
+            "INSERT INTO bookmark_types (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} {suffix}" });
     }
 
     private async Task<long> SeedBookmarkAsync()
@@ -71,7 +98,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
     {
         var id = await SeedBookmarkAsync();
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/updated", $"{TitlePrefix} Updated", "Updated description", 9, null);
+            "https://example.com/updated", $"{TitlePrefix} Updated", "Updated description", 9, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{id}", request, JsonOptions);
 
@@ -90,7 +117,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
     {
         var id = await SeedBookmarkAsync();
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/updated", $"{TitlePrefix} Updated", null, null, null);
+            "https://example.com/updated", $"{TitlePrefix} Updated", null, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{id}", request, JsonOptions);
 
@@ -104,7 +131,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
-        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest("https://example.com/missing", null, null, null, null);
+        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest("https://example.com/missing", null, null, null, null, null);
 
         var response = await _client.PutAsJsonAsync("/api/bookmarks/999999", request, JsonOptions);
 
@@ -115,7 +142,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
     public async Task Put_WithMissingUrl_ReturnsValidationProblem()
     {
         var id = await SeedBookmarkAsync();
-        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(" ", null, null, null, null);
+        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(" ", null, null, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{id}", request, JsonOptions);
 
@@ -131,7 +158,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
         await LinkCategoryAsync(bookmarkId, oldCategoryId);
 
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/original", null, null, null, [newCategoryId]);
+            "https://example.com/original", null, null, null, null, [newCategoryId]);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
 
@@ -150,7 +177,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
         await LinkCategoryAsync(bookmarkId, categoryId);
 
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/original", null, null, null, null);
+            "https://example.com/original", null, null, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
 
@@ -169,7 +196,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
         await LinkCategoryAsync(bookmarkId, categoryId);
 
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/original", null, null, null, []);
+            "https://example.com/original", null, null, null, null, []);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
 
@@ -185,7 +212,7 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
     {
         var bookmarkId = await SeedBookmarkAsync();
         var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
-            "https://example.com/should-not-apply", null, null, null, [999999]);
+            "https://example.com/should-not-apply", null, null, null, null, [999999]);
 
         var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
 
@@ -196,6 +223,74 @@ public class UpdateBookmarkEndpointTests : IAsyncLifetime
         Assert.True(problem.Errors.ContainsKey("CategoryIds"));
 
         // The rest of the update should have rolled back too, not just the category change.
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var url = await connection.QuerySingleAsync<string>(
+            "SELECT url FROM bookmarks WHERE id = @Id;", new { Id = bookmarkId });
+        Assert.Equal("https://example.com/original", url);
+    }
+
+    [Fact]
+    public async Task Put_WithBookmarkTypeId_SetsBookmarkType()
+    {
+        var bookmarkId = await SeedBookmarkAsync();
+        var bookmarkTypeId = await SeedBookmarkTypeAsync("Github");
+
+        // Title is set explicitly (not null) so the bookmark's title still matches TitlePrefix
+        // after this update - UpdateBookmarkEndpoint overwrites Title unconditionally, so a
+        // null here would wipe it and leave this row unmatched by CleanUpAsync's title-based
+        // delete once BookmarkTypeId is set on it.
+        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
+            "https://example.com/original", $"{TitlePrefix} Original", null, null, bookmarkTypeId, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateBookmarkEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Equal(bookmarkTypeId, updated.BookmarkTypeId);
+    }
+
+    [Fact]
+    public async Task Put_WithNullBookmarkTypeId_ClearsExistingBookmarkType()
+    {
+        var bookmarkTypeId = await SeedBookmarkTypeAsync("ToClear");
+        long bookmarkId;
+        using (var connection = await _connectionFactory.CreateConnectionAsync())
+        {
+            bookmarkId = await connection.QuerySingleAsync<long>(
+                "INSERT INTO bookmarks (url, title, bookmark_type_id) VALUES " +
+                "('https://example.com/original', @Title, @BookmarkTypeId) RETURNING id;",
+                new { Title = $"{TitlePrefix} Typed", BookmarkTypeId = bookmarkTypeId });
+        }
+
+        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
+            "https://example.com/original", $"{TitlePrefix} Typed", null, null, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateBookmarkEndpoint.BookmarkResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Null(updated.BookmarkTypeId);
+    }
+
+    [Fact]
+    public async Task Put_WithInvalidBookmarkTypeId_ReturnsValidationProblem_AndLeavesBookmarkUnchanged()
+    {
+        var bookmarkId = await SeedBookmarkAsync();
+        var request = new UpdateBookmarkEndpoint.UpdateBookmarkRequest(
+            "https://example.com/should-not-apply", null, null, null, 999999, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/bookmarks/{bookmarkId}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("BookmarkTypeId"));
+
         using var connection = await _connectionFactory.CreateConnectionAsync();
         var url = await connection.QuerySingleAsync<string>(
             "SELECT url FROM bookmarks WHERE id = @Id;", new { Id = bookmarkId });

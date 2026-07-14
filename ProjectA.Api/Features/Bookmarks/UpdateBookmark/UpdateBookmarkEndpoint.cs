@@ -15,7 +15,8 @@ public static class UpdateBookmarkEndpoint
             .WithDescription(
                 "Replaces an existing bookmark's url, title, description and rating. " +
                 "If CategoryIds is supplied it replaces the bookmark's category associations " +
-                "(pass an empty array to clear them); omit CategoryIds entirely to leave them unchanged.");
+                "(pass an empty array to clear them).  omit CategoryIds entirely to leave them unchanged.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<BookmarkResponse>, ValidationProblem, ProblemHttpResult>> Handle(
@@ -52,9 +53,12 @@ public static class UpdateBookmarkEndpoint
         entity.title = request.Title;
         entity.description = request.Description;
         entity.rating = (short)(request.Rating ?? entity.rating);
+        entity.bookmark_type_id = request.BookmarkTypeId;
         entity.date_modified = DateTime.UtcNow;
 
-        List<long> categoryIds;
+        // Separate try/catch from the CategoryIds one below (same convention as
+        // CreateBookmarkEndpoint/UpdateNoteEndpoint) so a bad BookmarkTypeId is attributed to
+        // BookmarkTypeId rather than being mistaken for a CategoryIds problem.
         try
         {
             var updated = await connection.UpdateAsync(entity, transaction);
@@ -63,7 +67,20 @@ public static class UpdateBookmarkEndpoint
                 transaction.Rollback();
                 return notFound;
             }
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
 
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.BookmarkTypeId)] = ["BookmarkTypeId does not refer to an existing bookmark type."]
+            });
+        }
+
+        List<long> categoryIds;
+        try
+        {
             // Null CategoryIds means "don't touch the associations" (same null-means-unchanged
             // convention as Rating above); an explicit list, even empty, replaces them.
             categoryIds = request.CategoryIds is not null
@@ -88,6 +105,7 @@ public static class UpdateBookmarkEndpoint
             entity.title,
             entity.description,
             entity.rating,
+            entity.bookmark_type_id,
             entity.date_created,
             entity.date_modified,
             categoryIds);
@@ -112,12 +130,17 @@ public static class UpdateBookmarkEndpoint
         return errors;
     }
 
-    // Request body accepted by this endpoint - owned by this slice, not shared.
+    // Request body accepted by this endpoint - owned by this slice, not shared. Unlike
+    // CategoryIds, BookmarkTypeId is a plain scalar (not a collection) so it follows the same
+    // "always overwrite" convention as Url/Title/Description - the Web form's dropdown always
+    // reflects the current selection (including "no type"), so there's no need for a separate
+    // null-means-unchanged sentinel here.
     public sealed record UpdateBookmarkRequest(
         string Url,
         string? Title,
         string? Description,
         int? Rating,
+        long? BookmarkTypeId,
         IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
@@ -127,6 +150,7 @@ public static class UpdateBookmarkEndpoint
         string? Title,
         string? Description,
         int Rating,
+        long? BookmarkTypeId,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> CategoryIds);

@@ -11,7 +11,8 @@ public static class UpdateAttachmentEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateAttachment")
             .WithSummary("Update an attachment")
-            .WithDescription("Replaces an existing attachment's title, description and S3 reference.");
+            .WithDescription("Replaces an existing attachment's title, description and S3 reference.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<AttachmentResponse>, ValidationProblem, ProblemHttpResult>> Handle(

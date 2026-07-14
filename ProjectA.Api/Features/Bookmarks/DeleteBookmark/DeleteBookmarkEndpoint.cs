@@ -14,7 +14,8 @@ public static class DeleteBookmarkEndpoint
             .WithSummary("Delete a bookmark")
             .WithDescription(
                 "Permanently removes a bookmark by Id. Any category associations for this " +
-                "bookmark are removed too, but the categories themselves are never touched.");
+                "bookmark are removed too, but the categories themselves are never touched.")
+            .RequireAuthorization();
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> Handle(
