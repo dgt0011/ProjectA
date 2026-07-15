@@ -17,11 +17,13 @@ public class ProjectEndpointsTests : IAsyncLifetime
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
+    private readonly HttpClient _anonymousClient;
     private readonly IDbConnectionFactory _connectionFactory;
 
     public ProjectEndpointsTests(ApiFactory factory)
     {
         _client = factory.CreateAuthenticatedClient();
+        _anonymousClient = factory.CreateClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
@@ -143,5 +145,69 @@ public class ProjectEndpointsTests : IAsyncLifetime
         var project = await response.Content.ReadFromJsonAsync<GetProjectByIdEndpoint.ProjectResponse>(JsonOptions);
         Assert.NotNull(project);
         Assert.Equal([noteId], project.NoteIds);
+    }
+
+    [Fact]
+    public async Task GetList_AsAnonymous_ExcludesPrivateNoteAssociations()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var projectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-01-01') RETURNING id;",
+            new { Title = $"{TitlePrefix} ListPrivateAssociated" });
+        var publicNoteId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListPublicNote" });
+        var privateNoteId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, is_private) VALUES (@Title, true) RETURNING id;",
+            new { Title = $"{TitlePrefix} ListPrivateNote" });
+        await connection.ExecuteAsync(
+            "INSERT INTO project_notes (project_id, note_id) VALUES (@ProjectId, @PublicNoteId), (@ProjectId, @PrivateNoteId);",
+            new { ProjectId = projectId, PublicNoteId = publicNoteId, PrivateNoteId = privateNoteId });
+
+        var anonymousResponse = await _anonymousClient.GetAsync("/api/projects");
+        var anonymousProjects = await anonymousResponse.Content
+            .ReadFromJsonAsync<List<GetProjectListEndpoint.ProjectListItemResponse>>(JsonOptions);
+        Assert.NotNull(anonymousProjects);
+        var anonymousFound = anonymousProjects.Single(p => p.Id == projectId);
+        Assert.Equal([publicNoteId], anonymousFound.NoteIds);
+
+        var authenticatedResponse = await _client.GetAsync("/api/projects");
+        var authenticatedProjects = await authenticatedResponse.Content
+            .ReadFromJsonAsync<List<GetProjectListEndpoint.ProjectListItemResponse>>(JsonOptions);
+        Assert.NotNull(authenticatedProjects);
+        var authenticatedFound = authenticatedProjects.Single(p => p.Id == projectId);
+        Assert.Equal(2, authenticatedFound.NoteIds.Count);
+        Assert.Contains(privateNoteId, authenticatedFound.NoteIds);
+    }
+
+    [Fact]
+    public async Task GetById_AsAnonymous_ExcludesPrivateNoteAssociations()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        var projectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-01-01') RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdPrivateAssociated" });
+        var publicNoteId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdPublicNote" });
+        var privateNoteId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, is_private) VALUES (@Title, true) RETURNING id;",
+            new { Title = $"{TitlePrefix} ByIdPrivateNote" });
+        await connection.ExecuteAsync(
+            "INSERT INTO project_notes (project_id, note_id) VALUES (@ProjectId, @PublicNoteId), (@ProjectId, @PrivateNoteId);",
+            new { ProjectId = projectId, PublicNoteId = publicNoteId, PrivateNoteId = privateNoteId });
+
+        var anonymousResponse = await _anonymousClient.GetAsync($"/api/projects/{projectId}");
+        var anonymousProject = await anonymousResponse.Content.ReadFromJsonAsync<GetProjectByIdEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(anonymousProject);
+        Assert.Equal([publicNoteId], anonymousProject.NoteIds);
+
+        var authenticatedResponse = await _client.GetAsync($"/api/projects/{projectId}");
+        var authenticatedProject = await authenticatedResponse.Content.ReadFromJsonAsync<GetProjectByIdEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(authenticatedProject);
+        Assert.Equal(2, authenticatedProject.NoteIds.Count);
+        Assert.Contains(privateNoteId, authenticatedProject.NoteIds);
     }
 }

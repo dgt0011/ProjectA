@@ -37,9 +37,15 @@ else
                 @foreach (var note in Model.AssociatedNotes)
                 {
                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a asp-page="/Notes/Details" asp-route-id="@note.Id">
-                            @(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)
-                        </a>
+                        <span>
+                            <a asp-page="/Notes/Details" asp-route-id="@note.Id">
+                                @(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)
+                            </a>
+                            @if (note.IsPrivate)
+                            {
+                                <span class="badge text-bg-secondary ms-1">Private</span>
+                            }
+                        </span>
                         <span class="text-muted small">@note.DateCreated.ToLocalTime().ToString("g")</span>
                     </li>
                 }

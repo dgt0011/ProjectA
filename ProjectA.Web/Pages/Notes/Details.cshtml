@@ -20,6 +20,10 @@ else
                 <span class="collapse-toggle-icon">&minus;</span>
             </button>
             <h1 class="mb-0">@(string.IsNullOrWhiteSpace(Model.Note.Title) ? "(untitled note)" : Model.Note.Title)</h1>
+            @if (Model.Note.IsPrivate)
+            {
+                <span class="badge text-bg-secondary ms-2">Private</span>
+            }
         </div>
         @if (User.Identity?.IsAuthenticated == true)
         {

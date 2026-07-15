@@ -42,6 +42,10 @@ else
                 <tr>
                     <td>
                         <a asp-page="Details" asp-route-id="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</a>
+                        @if (note.IsPrivate)
+                        {
+                            <span class="badge text-bg-secondary ms-1">Private</span>
+                        }
                     </td>
                     <td class="text-muted">@note.Description</td>
                     <td>@note.BookmarkIds.Count</td>

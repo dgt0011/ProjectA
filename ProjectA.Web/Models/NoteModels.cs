@@ -9,6 +9,7 @@ public sealed class NoteDto
     public string? Description { get; set; }
     public string? Body { get; set; }
     public long? ParentNoteId { get; set; }
+    public bool IsPrivate { get; set; }
     public DateTime DateCreated { get; set; }
     public DateTime? DateModified { get; set; }
     public List<long> BookmarkIds { get; set; } = [];
@@ -34,6 +35,13 @@ public sealed class NoteInput : IValidatableObject
 
     [Display(Name = "Parent note")]
     public long? ParentNoteId { get; set; }
+
+    // Only logged-in users ever see this checkbox (Create/Edit are both [Authorize]-gated),
+    // but the effect reaches anonymous visitors: a private note - and any child note that
+    // doesn't set its own flag - is hidden from them everywhere (Notes list, direct links,
+    // and any Project it's associated with). Enforced API-side, not just hidden client-side.
+    [Display(Name = "Private")]
+    public bool IsPrivate { get; set; }
 
     [Display(Name = "Bookmarks")]
     public List<long> BookmarkIds { get; set; } = [];

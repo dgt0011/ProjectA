@@ -18,6 +18,10 @@
                     <span class="collapse-toggle-icon">&minus;</span>
                 </button>
                 <strong>@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</strong>
+                @if (note.IsPrivate)
+                {
+                    <span class="badge text-bg-secondary ms-2">Private</span>
+                }
             </div>
             <span class="text-muted small">
                 Created @note.DateCreated.ToLocalTime().ToString("g")

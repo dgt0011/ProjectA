@@ -34,6 +34,7 @@ public static class CreateNoteEndpoint
             description = request.Description,
             body = request.Body,
             parent_note_id = request.ParentNoteId,
+            is_private = request.IsPrivate,
             date_created = DateTime.UtcNow
         };
 
@@ -97,6 +98,7 @@ public static class CreateNoteEndpoint
             entity.description,
             entity.body,
             entity.parent_note_id,
+            entity.is_private,
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
@@ -127,6 +129,7 @@ public static class CreateNoteEndpoint
         string? Description,
         string? Body,
         long? ParentNoteId,
+        bool IsPrivate,
         IReadOnlyCollection<long>? BookmarkIds,
         IReadOnlyCollection<long>? AttachmentIds);
 
@@ -137,6 +140,7 @@ public static class CreateNoteEndpoint
         string? Description,
         string? Body,
         long? ParentNoteId,
+        bool IsPrivate,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,

@@ -66,6 +66,7 @@ public static class UpdateNoteEndpoint
         entity.description = request.Description;
         entity.body = request.Body;
         entity.parent_note_id = request.ParentNoteId;
+        entity.is_private = request.IsPrivate;
         entity.date_modified = DateTime.UtcNow;
 
         bool updated;
@@ -133,6 +134,7 @@ public static class UpdateNoteEndpoint
             entity.description,
             entity.body,
             entity.parent_note_id,
+            entity.is_private,
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
@@ -156,15 +158,17 @@ public static class UpdateNoteEndpoint
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared. ParentNoteId
-    // is a plain scalar (not a collection) so, like Title/Description/Body, it's always
-    // overwritten outright rather than following the CategoryIds/BookmarkIds/AttachmentIds
-    // "null means unchanged" convention - the Web form's dropdown always reflects the current
-    // selection, including "no parent".
+    // and IsPrivate are plain scalars (not collections) so, like Title/Description/Body,
+    // they're always overwritten outright rather than following the
+    // CategoryIds/BookmarkIds/AttachmentIds "null means unchanged" convention - the Web form's
+    // dropdown/checkbox always reflect the current selection, including "no parent"/"not
+    // private".
     public sealed record UpdateNoteRequest(
         string? Title,
         string? Description,
         string? Body,
         long? ParentNoteId,
+        bool IsPrivate,
         IReadOnlyCollection<long>? BookmarkIds,
         IReadOnlyCollection<long>? AttachmentIds);
 
@@ -175,6 +179,7 @@ public static class UpdateNoteEndpoint
         string? Description,
         string? Body,
         long? ParentNoteId,
+        bool IsPrivate,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,

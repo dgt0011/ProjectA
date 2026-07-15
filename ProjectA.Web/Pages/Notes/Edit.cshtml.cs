@@ -38,6 +38,7 @@ public class EditModel(
             Description = result.Value.Description,
             Body = result.Value.Body,
             ParentNoteId = result.Value.ParentNoteId,
+            IsPrivate = result.Value.IsPrivate,
             BookmarkIds = [.. result.Value.BookmarkIds],
             AttachmentIds = [.. result.Value.AttachmentIds]
         };
