@@ -42,3 +42,19 @@ public sealed class ProjectInput
     [Display(Name = "Attachments")]
     public List<long> AttachmentIds { get; set; } = [];
 }
+
+// View model for rendering one Note in full (title, description, body, its own bookmarks/
+// attachments) inside a collapsible container on the Project Details page. BookmarkTypesById
+// is the same shared lookup for every note on the page (built once in DetailsModel), handed
+// down so the _ProjectNoteItem partial can resolve each bookmark's icon/color without its own
+// round trip.
+public sealed class ProjectNoteItemViewModel
+{
+    public required NoteDto Note { get; init; }
+
+    public required List<BookmarkDto> AssociatedBookmarks { get; init; }
+
+    public required List<AttachmentDto> AssociatedAttachments { get; init; }
+
+    public required IReadOnlyDictionary<long, BookmarkTypeDto> BookmarkTypesById { get; init; }
+}

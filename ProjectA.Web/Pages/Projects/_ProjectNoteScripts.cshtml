@@ -1,0 +1,43 @@
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script>
+    // Renders each associated Note's raw Markdown body (sitting untouched in its own hidden
+    // .project-note-body-raw textarea, matched to its .project-note-body-rendered container by
+    // a shared data-note-id) the same safe way Notes' own Details page does: marked.parse()
+    // followed by DOMPurify.sanitize() before ever touching innerHTML.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof marked !== 'undefined') {
+            document.querySelectorAll('.project-note-body-raw').forEach(function (rawTextarea) {
+                var noteId = rawTextarea.getAttribute('data-note-id');
+                var rendered = document.querySelector('.project-note-body-rendered[data-note-id="' + noteId + '"]');
+                if (!rendered) {
+                    return;
+                }
+
+                var html = marked.parse(rawTextarea.value || '');
+                if (typeof DOMPurify !== 'undefined') {
+                    html = DOMPurify.sanitize(html);
+                }
+
+                rendered.innerHTML = html;
+            });
+        }
+
+        // Each Note card starts collapsed (+); flips to - while expanded, in step with
+        // Bootstrap's own shown/hidden events, so the toggle button always reflects the
+        // Note's actual state.
+        document.querySelectorAll('.project-note-collapse').forEach(function (collapseEl) {
+            var toggleButton = document.querySelector('[data-bs-target="#' + collapseEl.id + '"] .collapse-toggle-icon');
+            if (!toggleButton) {
+                return;
+            }
+
+            collapseEl.addEventListener('shown.bs.collapse', function () {
+                toggleButton.innerHTML = '&minus;';
+            });
+            collapseEl.addEventListener('hidden.bs.collapse', function () {
+                toggleButton.textContent = '+';
+            });
+        });
+    });
+</script>

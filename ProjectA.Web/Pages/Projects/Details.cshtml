@@ -27,29 +27,19 @@ else
 
     <div class="mt-4">
         <h2 class="h5">Notes</h2>
-        @if (Model.AssociatedNotes.Count == 0)
+        @if (Model.AssociatedNoteItems.Count == 0)
         {
             <p class="text-muted">No notes associated with this project.</p>
         }
         else
         {
-            <ul class="list-group">
-                @foreach (var note in Model.AssociatedNotes)
-                {
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>
-                            <a asp-page="/Notes/Details" asp-route-id="@note.Id">
-                                @(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)
-                            </a>
-                            @if (note.IsPrivate)
-                            {
-                                <span class="badge text-bg-secondary ms-1">Private</span>
-                            }
-                        </span>
-                        <span class="text-muted small">@note.DateCreated.ToLocalTime().ToString("g")</span>
-                    </li>
-                }
-            </ul>
+            @* Oldest-first, each collapsed to just its title/dates by default - expand any
+               one to read it in full without losing this page's place in the list, so notes
+               can be read in context with the ones immediately before and after. *@
+            foreach (var noteItem in Model.AssociatedNoteItems)
+            {
+                <partial name="_ProjectNoteItem" model="noteItem" />
+            }
         }
     </div>
 
@@ -97,4 +87,8 @@ else
     <p class="mt-3">
         <a asp-page="Index" class="btn btn-link ps-0">Back to Projects</a>
     </p>
+}
+
+@section Scripts {
+    <partial name="_ProjectNoteScripts" />
 }
