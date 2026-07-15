@@ -48,14 +48,11 @@ else
         <textarea id="note-body-raw" class="d-none">@Model.Note.Body</textarea>
         <div id="note-body-rendered" class="border rounded p-3"></div>
 
-        <div class="mt-4">
-            <h2 class="h5">Bookmarks</h2>
-            @if (Model.AssociatedBookmarks.Count == 0)
-            {
-                <p class="text-muted">No bookmarks associated with this note.</p>
-            }
-            else
-            {
+        @if (Model.AssociatedBookmarks.Count > 0)
+        {
+            <div class="mt-4">
+                <h2 class="h5">References</h2>
+
                 <ul class="list-group">
                     @foreach (var bookmark in Model.AssociatedBookmarks)
                     {
@@ -66,17 +63,13 @@ else
                         </li>
                     }
                 </ul>
-            }
-        </div>
+            </div>
+        }
 
-        <div class="mt-4">
-            <h2 class="h5">Attachments</h2>
-            @if (Model.AssociatedAttachments.Count == 0)
-            {
-                <p class="text-muted">No attachments associated with this note.</p>
-            }
-            else
-            {
+        @if (Model.AssociatedAttachments.Count > 0)
+        {
+            <div class="mt-4">
+                <h2 class="h5">Attachments</h2>
                 <ul class="list-group">
                     @foreach (var attachment in Model.AssociatedAttachments)
                     {
@@ -86,8 +79,8 @@ else
                         </li>
                     }
                 </ul>
-            }
-        </div>
+            </div>
+        }
 
         @if (mainChildren.Count > 0)
         {
