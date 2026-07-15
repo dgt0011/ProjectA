@@ -22,37 +22,57 @@ else if (Model.Projects.Count == 0)
 }
 else
 {
+    <div class="row g-4">
+    
+        @foreach (var project in Model.Projects)
+        {
+                
+            <div class="col-sm-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@project.Title</h5>
+                        <p class="card-text text-muted">@project.Description</p>
+                        <a asp-page="Details" asp-route-id="@project.Id" class="btn btn-primary">View</a>
+                    </div>
+                </div>
+            </div>
+        }
+    
+    </div>
+    
+    <!--
     <table class="table table-striped align-middle">
         <thead>
-            <tr>
-                <th>Title</th>
-                <th>Description</th>
-                <th>Start date</th>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <th class="text-end">Actions</th>
-                }
-            </tr>
+        <tr>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Start date</th>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <th class="text-end">Actions</th>
+            }
+        </tr>
         </thead>
         <tbody>
-            @foreach (var project in Model.Projects)
-            {
-                <tr>
-                    <td><a asp-page="Details" asp-route-id="@project.Id">@project.Title</a></td>
-                    <td>@project.Description</td>
-                    <td>@project.StartDate.ToString("yyyy-MM-dd")</td>
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <td class="text-end">
-                            <a asp-page="Edit" asp-route-id="@project.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@project.Id" class="d-inline"
-                                  onsubmit="return confirm('Delete this project?');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                            </form>
-                        </td>
-                    }
-                </tr>
-            }
+        @foreach (var project in Model.Projects)
+        {
+            <tr>
+                <td><a asp-page="Details" asp-route-id="@project.Id">@project.Title</a></td>
+                <td>@project.Description</td>
+                <td>@project.StartDate.ToString("yyyy-MM-dd")</td>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <td class="text-end">
+                        <a asp-page="Edit" asp-route-id="@project.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" asp-page-handler="Delete" asp-route-id="@project.Id" class="d-inline"
+                              onsubmit="return confirm('Delete this project?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                }
+            </tr>
+        }
         </tbody>
     </table>
+    -->
 }

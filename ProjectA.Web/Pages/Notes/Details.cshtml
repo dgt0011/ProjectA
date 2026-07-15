@@ -15,10 +15,12 @@ else
 {
     <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="d-flex align-items-center">
+            <!--
             <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
                     data-bs-target="#note-collapse-main" aria-expanded="true" aria-controls="note-collapse-main">
                 <span class="collapse-toggle-icon">&minus;</span>
             </button>
+            -->
             <h1 class="mb-0">@(string.IsNullOrWhiteSpace(Model.Note.Title) ? "(untitled note)" : Model.Note.Title)</h1>
             @if (Model.Note.IsPrivate)
             {
