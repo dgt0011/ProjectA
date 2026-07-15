@@ -12,7 +12,8 @@ namespace ProjectA.Web.Pages.Notes;
 public class DetailsModel(
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
-    IAttachmentsApiClient attachmentsApiClient) : PageModel
+    IAttachmentsApiClient attachmentsApiClient,
+    IBookmarkTypesApiClient bookmarkTypesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -24,6 +25,14 @@ public class DetailsModel(
     // page resolves CategoryIds to titles.
     public List<BookmarkDto> AssociatedBookmarks { get; set; } = [];
     public List<AttachmentDto> AssociatedAttachments { get; set; } = [];
+
+    private Dictionary<long, BookmarkTypeDto> _bookmarkTypesById = [];
+
+    // Null when the bookmark has no BookmarkTypeId, or the type it referred to no longer
+    // exists - same helper/semantics as Bookmarks' own Index page (BookmarkType(...)) so the
+    // icon/row-color treatment stays identical wherever a bookmark is listed.
+    public BookmarkTypeDto? BookmarkType(long? bookmarkTypeId) =>
+        bookmarkTypeId is long id ? _bookmarkTypesById.GetValueOrDefault(id) : null;
 
     // Built once from the full notes list so the recursive _NoteTreeItem partial can look up
     // any note's direct children without re-fetching. Only Note's own descendants ever get
@@ -54,13 +63,23 @@ public class DetailsModel(
 
         if (Note.BookmarkIds.Count > 0)
         {
-            var bookmarksResult = await bookmarksApiClient.GetListAsync(cancellationToken);
+            var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
+            var bookmarkTypesTask = bookmarkTypesApiClient.GetListAsync(cancellationToken);
+            await Task.WhenAll(bookmarksTask, bookmarkTypesTask);
+
+            var bookmarksResult = await bookmarksTask;
             if (bookmarksResult.IsSuccess)
             {
                 var bookmarkIds = Note.BookmarkIds.ToHashSet();
                 AssociatedBookmarks = (bookmarksResult.Value ?? [])
                     .Where(bookmark => bookmarkIds.Contains(bookmark.Id))
                     .ToList();
+            }
+
+            var bookmarkTypesResult = await bookmarkTypesTask;
+            if (bookmarkTypesResult.IsSuccess)
+            {
+                _bookmarkTypesById = (bookmarkTypesResult.Value ?? []).ToDictionary(bookmarkType => bookmarkType.Id);
             }
         }
 

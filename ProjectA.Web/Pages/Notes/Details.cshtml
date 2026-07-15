@@ -56,7 +56,14 @@ else
                 <ul class="list-group">
                     @foreach (var bookmark in Model.AssociatedBookmarks)
                     {
-                        <li class="list-group-item">
+                        var bookmarkType = Model.BookmarkType(bookmark.BookmarkTypeId);
+                        <li class="list-group-item d-flex align-items-center"
+                            style="@(!string.IsNullOrWhiteSpace(bookmarkType?.Color) ? $"background-color: {bookmarkType.Color};" : "")">
+                            @if (bookmarkType is { HasIcon: true })
+                            {
+                                <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16"
+                                     title="@bookmarkType.Title" class="me-2" />
+                            }
                             <a href="@bookmark.Url" target="_blank" rel="noopener">
                                 @(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)
                             </a>
