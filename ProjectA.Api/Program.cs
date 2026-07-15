@@ -12,6 +12,7 @@ using ProjectA.Api.Features.Notes;
 using ProjectA.Api.Features.Projects;
 using ProjectA.Api.Features.ToDo;
 using ProjectA.Api.Features.Users;
+using ProjectA.Api.Schema;
 using ProjectA.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,8 +36,22 @@ builder.Services.AddProblemDetails(options =>
 //   .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
 //    .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
-builder.Services.AddSingleton<IDbConnectionFactory>(_ =>
-    new PostgresDbConnectionFactory(builder.Configuration.GetConnectionString("DefaultConnection")!));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+
+builder.Services.AddSingleton<IDbConnectionFactory>(_ => new PostgresDbConnectionFactory(connectionString));
+
+// Applies any ProjectA.Api.Schema scripts (script001, script002, ... ) that haven't run
+// against this database yet - DbUp tracks what's already applied in a schemaversions table,
+// so this is a safe no-op on every startup after the first time a given script runs. Without
+// this, every new migration (like the one that added notes.is_private) would silently never
+// reach a real database unless someone remembered to run ProjectA.Api.Schema by hand -
+// ApiFactory already does the equivalent of this for the test suite, but nothing previously
+// did it for the actual running API.
+if (!Upgrader.Upgrade(connectionString))
+{
+    throw new InvalidOperationException(
+        "Database migration failed - check console output from DbUp for the failing script.");
+}
 
 // Auth: JwtTokenService (used by the login endpoint to mint tokens) and the JwtBearer handler
 // (used by [RequireAuthorization] on Create/Update/Delete endpoints to validate them) read the
