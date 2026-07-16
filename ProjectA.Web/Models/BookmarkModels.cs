@@ -40,3 +40,14 @@ public sealed class BookmarkInput
     [Display(Name = "Categories")]
     public List<long> CategoryIds { get; set; } = [];
 }
+
+// One accordion section on the Bookmarks Index page. CategoryId is null only for the
+// synthetic "Uncategorized" section (bookmarks with an empty CategoryIds) - that section is
+// not a real Category, so it's appended after all real ones rather than sorted among them.
+// A Bookmark with more than one Category deliberately appears in more than one group here.
+public sealed class BookmarkCategoryGroup
+{
+    public long? CategoryId { get; init; }
+    public required string CategoryTitle { get; init; }
+    public required List<BookmarkDto> Bookmarks { get; init; }
+}

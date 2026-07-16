@@ -10,7 +10,7 @@ public class IndexModel(
     ICategoriesApiClient categoriesApiClient,
     IBookmarkTypesApiClient bookmarkTypesApiClient) : PageModel
 {
-    public List<BookmarkDto> Bookmarks { get; set; } = [];
+    public List<BookmarkCategoryGroup> CategoryGroups { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
 
     private Dictionary<long, string> _categoryTitlesById = [];
@@ -32,26 +32,48 @@ public class IndexModel(
         await Task.WhenAll(bookmarksTask, categoriesTask, bookmarkTypesTask);
 
         var bookmarksResult = await bookmarksTask;
-        if (bookmarksResult.IsSuccess)
-        {
-            Bookmarks = bookmarksResult.Value ?? [];
-        }
-        else
+        var bookmarks = bookmarksResult.IsSuccess ? bookmarksResult.Value ?? [] : [];
+        if (!bookmarksResult.IsSuccess)
         {
             LoadedSuccessfully = false;
         }
 
+        HasAnyBookmarks = bookmarks.Count > 0;
+
         var categoriesResult = await categoriesTask;
-        if (categoriesResult.IsSuccess)
-        {
-            _categoryTitlesById = (categoriesResult.Value ?? []).ToDictionary(category => category.Id, category => category.Title);
-        }
+        var categories = categoriesResult.IsSuccess ? categoriesResult.Value ?? [] : [];
+        _categoryTitlesById = categories.ToDictionary(category => category.Id, category => category.Title);
 
         var bookmarkTypesResult = await bookmarkTypesTask;
         if (bookmarkTypesResult.IsSuccess)
         {
             _bookmarkTypesById = (bookmarkTypesResult.Value ?? []).ToDictionary(bookmarkType => bookmarkType.Id);
         }
+
+        // Every Category gets its own accordion section, even ones with no matching
+        // Bookmarks - a Bookmark with more than one Category ends up listed under more than
+        // one section, which is expected since CategoryIds is a many-to-many association.
+        var groups = categories
+            .Select(category => new BookmarkCategoryGroup
+            {
+                CategoryId = category.Id,
+                CategoryTitle = category.Title,
+                Bookmarks = bookmarks.Where(bookmark => bookmark.CategoryIds.Contains(category.Id)).ToList()
+            })
+            .ToList();
+
+        var uncategorized = bookmarks.Where(bookmark => bookmark.CategoryIds.Count == 0).ToList();
+        if (uncategorized.Count > 0)
+        {
+            groups.Add(new BookmarkCategoryGroup
+            {
+                CategoryId = null,
+                CategoryTitle = "Uncategorized",
+                Bookmarks = uncategorized
+            });
+        }
+
+        CategoryGroups = groups;
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(long id, CancellationToken cancellationToken)
