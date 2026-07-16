@@ -17,5 +17,6 @@ internal sealed class ProjectDto
     public string title { get; set; } = string.Empty;
     public string? description { get; set; }
     public DateTime start_date { get; set; }
+    public bool is_private { get; set; }
 }
 // ReSharper restore InconsistentNaming

@@ -210,4 +210,45 @@ public class ProjectEndpointsTests : IAsyncLifetime
         Assert.Equal(2, authenticatedProject.NoteIds.Count);
         Assert.Contains(privateNoteId, authenticatedProject.NoteIds);
     }
+
+    [Fact]
+    public async Task GetList_AsAnonymous_ExcludesPrivateProjects()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var privateProjectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date, is_private) VALUES (@Title, '2026-01-01', true) RETURNING id;",
+            new { Title = $"{TitlePrefix} PrivateProject" });
+        var publicProjectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date, is_private) VALUES (@Title, '2026-01-01', false) RETURNING id;",
+            new { Title = $"{TitlePrefix} PublicProject" });
+
+        var anonymousResponse = await _anonymousClient.GetAsync("/api/projects");
+        var anonymousProjects = await anonymousResponse.Content
+            .ReadFromJsonAsync<List<GetProjectListEndpoint.ProjectListItemResponse>>(JsonOptions);
+        Assert.NotNull(anonymousProjects);
+        Assert.DoesNotContain(anonymousProjects, p => p.Id == privateProjectId);
+        Assert.Contains(anonymousProjects, p => p.Id == publicProjectId);
+
+        var authenticatedResponse = await _client.GetAsync("/api/projects");
+        var authenticatedProjects = await authenticatedResponse.Content
+            .ReadFromJsonAsync<List<GetProjectListEndpoint.ProjectListItemResponse>>(JsonOptions);
+        Assert.NotNull(authenticatedProjects);
+        Assert.Contains(authenticatedProjects, p => p.Id == privateProjectId);
+        Assert.Contains(authenticatedProjects, p => p.Id == publicProjectId);
+    }
+
+    [Fact]
+    public async Task GetById_AsAnonymous_OnPrivateProject_ReturnsNotFound()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var privateProjectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date, is_private) VALUES (@Title, '2026-01-01', true) RETURNING id;",
+            new { Title = $"{TitlePrefix} PrivateById" });
+
+        var anonymousResponse = await _anonymousClient.GetAsync($"/api/projects/{privateProjectId}");
+        Assert.Equal(HttpStatusCode.NotFound, anonymousResponse.StatusCode);
+
+        var authenticatedResponse = await _client.GetAsync($"/api/projects/{privateProjectId}");
+        Assert.Equal(HttpStatusCode.OK, authenticatedResponse.StatusCode);
+    }
 }

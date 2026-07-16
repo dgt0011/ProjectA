@@ -45,7 +45,8 @@ public static class UpdateProjectEndpoint
             id = (long)id,
             title = request.Title,
             description = request.Description,
-            start_date = request.StartDate!.Value
+            start_date = request.StartDate!.Value,
+            is_private = request.IsPrivate
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
@@ -115,7 +116,7 @@ public static class UpdateProjectEndpoint
         transaction.Commit();
 
         return TypedResults.Ok(new ProjectResponse(
-            entity.id, entity.title, entity.description, entity.start_date, noteIds, bookmarkIds, attachmentIds));
+            entity.id, entity.title, entity.description, entity.start_date, entity.is_private, noteIds, bookmarkIds, attachmentIds));
     }
 
     private static Dictionary<string, string[]> Validate(UpdateProjectRequest request)
@@ -140,6 +141,7 @@ public static class UpdateProjectEndpoint
         string Title,
         string? Description,
         DateTime? StartDate,
+        bool IsPrivate,
         IReadOnlyCollection<long>? NoteIds,
         IReadOnlyCollection<long>? BookmarkIds,
         IReadOnlyCollection<long>? AttachmentIds);
@@ -150,6 +152,7 @@ public static class UpdateProjectEndpoint
         string Title,
         string? Description,
         DateTime StartDate,
+        bool IsPrivate,
         IReadOnlyCollection<long> NoteIds,
         IReadOnlyCollection<long> BookmarkIds,
         IReadOnlyCollection<long> AttachmentIds);

@@ -11,7 +11,13 @@
 else
 {
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <h1>@Model.Project.Title</h1>
+        <h1>
+            @Model.Project.Title
+            @if (Model.Project.IsPrivate)
+            {
+                <span class="badge text-bg-secondary ms-2">Private</span>
+            }
+        </h1>
         @if (User.Identity?.IsAuthenticated == true)
         {
             <a asp-page="Edit" asp-route-id="@Model.Project.Id" class="btn btn-outline-secondary">Edit</a>
@@ -26,7 +32,13 @@ else
     <p class="text-muted small">Start date @Model.Project.StartDate.ToString("yyyy-MM-dd")</p>
 
     <div class="mt-4">
-        <h2 class="h5">Notes</h2>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="h5">Notes</h2>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a asp-page="/Notes/Create" asp-route-projectId="@Model.Project.Id" class="btn btn-primary btn-sm">Create note</a>
+            }
+        </div>
         @if (Model.AssociatedNoteItems.Count == 0)
         {
             <p class="text-muted">No notes associated with this project.</p>

@@ -91,7 +91,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     {
         var id = await SeedProjectAsync();
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Updated", "Updated description", new DateTime(2026, 7, 4).Date, null, null, null);
+            $"{TitlePrefix} Updated", "Updated description", new DateTime(2026, 7, 4).Date, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
 
@@ -108,7 +108,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Missing", null, new DateTime(2026, 1, 1).Date, null, null, null);
+            $"{TitlePrefix} Missing", null, new DateTime(2026, 1, 1).Date, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync("/api/projects/999999", request, JsonOptions);
 
@@ -119,7 +119,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     public async Task Put_WithMissingTitle_ReturnsValidationProblem()
     {
         var id = await SeedProjectAsync();
-        var request = new UpdateProjectEndpoint.UpdateProjectRequest(" ", null, new DateTime(2026, 1, 1).Date, null, null, null);
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(" ", null, new DateTime(2026, 1, 1).Date, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
 
@@ -135,7 +135,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
         await LinkNoteAsync(projectId, oldNoteId);
 
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, [newNoteId], null, null);
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, false, [newNoteId], null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
 
@@ -154,7 +154,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
         await LinkNoteAsync(projectId, noteId);
 
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, null, null, null);
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
 
@@ -173,7 +173,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
         await LinkNoteAsync(projectId, noteId);
 
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, [], null, null);
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, false, [], null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
 
@@ -189,7 +189,7 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
     {
         var projectId = await SeedProjectAsync();
         var request = new UpdateProjectEndpoint.UpdateProjectRequest(
-            $"{TitlePrefix} ShouldNotApply", null, new DateTime(2026, 1, 1).Date, null, [999999], null);
+            $"{TitlePrefix} ShouldNotApply", null, new DateTime(2026, 1, 1).Date, false, null, [999999], null);
 
         var response = await _client.PutAsJsonAsync($"/api/projects/{projectId}", request, JsonOptions);
 
@@ -203,6 +203,22 @@ public class UpdateProjectEndpointTests : IAsyncLifetime
         var title = await connection.QuerySingleAsync<string>(
             "SELECT title FROM projects WHERE id = @Id;", new { Id = projectId });
         Assert.Equal($"{TitlePrefix} Original", title);
+    }
+
+    [Fact]
+    public async Task Put_WithIsPrivateTrue_SetsPrivateFlag()
+    {
+        var id = await SeedProjectAsync();
+        var request = new UpdateProjectEndpoint.UpdateProjectRequest(
+            $"{TitlePrefix} Original", null, new DateTime(2026, 1, 1).Date, true, null, null, null);
+
+        var response = await _client.PutAsJsonAsync($"/api/projects/{id}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateProjectEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.True(updated.IsPrivate);
     }
 
     private sealed record ValidationProblemResponse(

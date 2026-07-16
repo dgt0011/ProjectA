@@ -41,6 +41,7 @@ public sealed class ProjectsApiClient(HttpClient httpClient) : ApiClientBase(htt
         input.StartDate is { } startDate
             ? DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
             : null,
+        input.IsPrivate,
         input.NoteIds,
         input.BookmarkIds,
         input.AttachmentIds);
@@ -49,6 +50,7 @@ public sealed class ProjectsApiClient(HttpClient httpClient) : ApiClientBase(htt
         string Title,
         string? Description,
         DateTime? StartDate,
+        bool IsPrivate,
         List<long> NoteIds,
         List<long> BookmarkIds,
         List<long> AttachmentIds);

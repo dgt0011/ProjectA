@@ -8,6 +8,7 @@ public sealed class ProjectDto
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public DateTime StartDate { get; set; }
+    public bool IsPrivate { get; set; }
     public List<long> NoteIds { get; set; } = [];
     public List<long> BookmarkIds { get; set; } = [];
     public List<long> AttachmentIds { get; set; } = [];
@@ -32,6 +33,13 @@ public sealed class ProjectInput
     [Required(ErrorMessage = "Start date is required.")]
     [Display(Name = "Start date")]
     public DateOnly? StartDate { get; set; }
+
+    // Only logged-in users ever see this checkbox (Create/Edit are both [Authorize]-gated),
+    // but the effect reaches anonymous visitors: a private project is hidden from them
+    // everywhere (Projects list, direct links). Enforced API-side, not just hidden
+    // client-side.
+    [Display(Name = "Private")]
+    public bool IsPrivate { get; set; }
 
     [Display(Name = "Notes")]
     public List<long> NoteIds { get; set; } = [];

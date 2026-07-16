@@ -31,6 +31,8 @@
       <EmbeddedResource Include="Scripts\script008-AlterTable-Notes-Add-ParentNoteId.sql" />
       <None Remove="Scripts\script009-AlterTable-Notes-Add-IsPrivate.sql" />
       <EmbeddedResource Include="Scripts\script009-AlterTable-Notes-Add-IsPrivate.sql" />
+      <None Remove="Scripts\script010-AlterTable-Projects-Add-IsPrivate.sql" />
+      <EmbeddedResource Include="Scripts\script010-AlterTable-Projects-Add-IsPrivate.sql" />
     </ItemGroup>
 
 </Project>

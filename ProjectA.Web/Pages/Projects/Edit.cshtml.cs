@@ -38,6 +38,7 @@ public class EditModel(
             Title = result.Value.Title,
             Description = result.Value.Description,
             StartDate = DateOnly.FromDateTime(result.Value.StartDate),
+            IsPrivate = result.Value.IsPrivate,
             NoteIds = [.. result.Value.NoteIds],
             BookmarkIds = [.. result.Value.BookmarkIds],
             AttachmentIds = [.. result.Value.AttachmentIds]

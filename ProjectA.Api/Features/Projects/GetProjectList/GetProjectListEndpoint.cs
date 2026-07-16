@@ -14,13 +14,15 @@ public static class GetProjectListEndpoint
             .WithName("GetProjectList")
             .WithSummary("List projects")
             .WithDescription(
-                "Returns all projects. Each project's NoteIds excludes any associated note " +
-                "that's private (or inherits privacy from a private ancestor) when the caller " +
-                "isn't logged in - same rule GetNoteList/GetNoteById apply to notes directly.");
+                "Returns all projects visible to the caller. Callers who aren't logged in " +
+                "never see private projects, and each returned project's NoteIds excludes any " +
+                "associated note that's private (or inherits privacy from a private ancestor) " +
+                "- same rule GetNoteList/GetNoteById apply to notes directly.");
     }
 
-    // Not .RequireAuthorization() - anyone can list public projects. See GetNoteListEndpoint
-    // for why ClaimsPrincipal can still be trusted here without forcing authentication.
+    // Not .RequireAuthorization() - anyone can list public projects, they just get a filtered
+    // view. See GetNoteListEndpoint for why ClaimsPrincipal can still be trusted here without
+    // forcing authentication.
     private static async Task<Ok<List<ProjectListItemResponse>>> Handle(
         ClaimsPrincipal user,
         IDbConnectionFactory connectionFactory,
@@ -31,11 +33,17 @@ public static class GetProjectListEndpoint
             using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
             var entities = await connection.GetAllAsync<ProjectDto>();
 
+            var isAuthenticated = user.Identity?.IsAuthenticated == true;
+            if (!isAuthenticated)
+            {
+                entities = entities.Where(entity => !entity.is_private).ToList();
+            }
+
             var noteIdsByProject = await ProjectNoteLinks.GetNoteIdsForAllProjectsAsync(connection, cancellationToken);
             var bookmarkIdsByProject = await ProjectBookmarkLinks.GetBookmarkIdsForAllProjectsAsync(connection, cancellationToken);
             var attachmentIdsByProject = await ProjectAttachmentLinks.GetAttachmentIdsForAllProjectsAsync(connection, cancellationToken);
 
-            var privateNoteIds = user.Identity?.IsAuthenticated == true
+            var privateNoteIds = isAuthenticated
                 ? new HashSet<long>()
                 : await NotePrivacy.GetEffectivelyPrivateNoteIdsAsync(connection, cancellationToken);
 
@@ -45,6 +53,7 @@ public static class GetProjectListEndpoint
                     entity.title,
                     entity.description,
                     entity.start_date,
+                    entity.is_private,
                     noteIdsByProject[entity.id].Where(noteId => !privateNoteIds.Contains(noteId)).ToList(),
                     bookmarkIdsByProject[entity.id].ToList(),
                     attachmentIdsByProject[entity.id].ToList()))
@@ -65,6 +74,7 @@ public static class GetProjectListEndpoint
         string Title,
         string? Description,
         DateTime StartDate,
+        bool IsPrivate,
         IReadOnlyCollection<long> NoteIds,
         IReadOnlyCollection<long> BookmarkIds,
         IReadOnlyCollection<long> AttachmentIds);

@@ -30,7 +30,13 @@ else
             <div class="col-sm-6 col-lg-4">
                 <div class="card h-100">
                     <div class="card-body">
-                        <h5 class="card-title">@project.Title</h5>
+                        <h5 class="card-title">
+                            @project.Title
+                            @if (project.IsPrivate)
+                            {
+                                <span class="badge text-bg-secondary">Private</span>
+                            }
+                        </h5>
                         <p class="card-text text-muted">@project.Description</p>
                         <a asp-page="Details" asp-route-id="@project.Id" class="btn btn-primary">View</a>
                     </div>

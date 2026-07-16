@@ -84,7 +84,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     public async Task Post_WithValidRequest_CreatesProjectAndReturnsCreated()
     {
         var request = new CreateProjectEndpoint.CreateProjectRequest(
-            $"{TitlePrefix} New", "A description", new DateTime(2026, 6, 1).Date, null, null, null);
+            $"{TitlePrefix} New", "A description", new DateTime(2026, 6, 1).Date, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -102,7 +102,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithMissingTitle_ReturnsValidationProblem()
     {
-        var request = new CreateProjectEndpoint.CreateProjectRequest(" ", null, new DateTime(2026, 6, 1).Date, null, null, null);
+        var request = new CreateProjectEndpoint.CreateProjectRequest(" ", null, new DateTime(2026, 6, 1).Date, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -116,7 +116,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithMissingStartDate_ReturnsValidationProblem()
     {
-        var request = new CreateProjectEndpoint.CreateProjectRequest($"{TitlePrefix} NoDate", null, null, null, null, null);
+        var request = new CreateProjectEndpoint.CreateProjectRequest($"{TitlePrefix} NoDate", null, null, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -135,7 +135,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
         var attachmentId = await SeedAttachmentAsync("Attachment");
 
         var request = new CreateProjectEndpoint.CreateProjectRequest(
-            $"{TitlePrefix} Associated", null, new DateTime(2026, 6, 1).Date,
+            $"{TitlePrefix} Associated", null, new DateTime(2026, 6, 1).Date, false,
             [noteId], [bookmarkId], [attachmentId]);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
@@ -160,7 +160,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     public async Task Post_WithInvalidNoteId_ReturnsValidationProblem_AndCreatesNoProject()
     {
         var request = new CreateProjectEndpoint.CreateProjectRequest(
-            $"{TitlePrefix} BadNote", null, new DateTime(2026, 6, 1).Date, [999999], null, null);
+            $"{TitlePrefix} BadNote", null, new DateTime(2026, 6, 1).Date, false, [999999], null, null);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -180,7 +180,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     public async Task Post_WithInvalidBookmarkId_ReturnsValidationProblem()
     {
         var request = new CreateProjectEndpoint.CreateProjectRequest(
-            $"{TitlePrefix} BadBookmark", null, new DateTime(2026, 6, 1).Date, null, [999999], null);
+            $"{TitlePrefix} BadBookmark", null, new DateTime(2026, 6, 1).Date, false, null, [999999], null);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -195,7 +195,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     public async Task Post_WithInvalidAttachmentId_ReturnsValidationProblem()
     {
         var request = new CreateProjectEndpoint.CreateProjectRequest(
-            $"{TitlePrefix} BadAttachment", null, new DateTime(2026, 6, 1).Date, null, null, [999999]);
+            $"{TitlePrefix} BadAttachment", null, new DateTime(2026, 6, 1).Date, false, null, null, [999999]);
 
         var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
 
@@ -204,6 +204,21 @@ public class CreateProjectEndpointTests : IAsyncLifetime
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
         Assert.NotNull(problem);
         Assert.True(problem.Errors.ContainsKey("AttachmentIds"));
+    }
+
+    [Fact]
+    public async Task Post_WithIsPrivateTrue_SetsPrivateFlag()
+    {
+        var request = new CreateProjectEndpoint.CreateProjectRequest(
+            $"{TitlePrefix} Private", null, new DateTime(2026, 6, 1).Date, true, null, null, null);
+
+        var response = await _client.PostAsJsonAsync("/api/projects", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var created = await response.Content.ReadFromJsonAsync<CreateProjectEndpoint.ProjectResponse>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.True(created.IsPrivate);
     }
 
     private sealed record ValidationProblemResponse(

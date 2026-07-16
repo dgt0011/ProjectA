@@ -33,7 +33,8 @@ public static class CreateProjectEndpoint
         {
             title = request.Title,
             description = request.Description,
-            start_date = request.StartDate!.Value
+            start_date = request.StartDate!.Value,
+            is_private = request.IsPrivate
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
@@ -92,7 +93,7 @@ public static class CreateProjectEndpoint
         transaction.Commit();
 
         var response = new ProjectResponse(
-            entity.id, entity.title, entity.description, entity.start_date, noteIds, bookmarkIds, attachmentIds);
+            entity.id, entity.title, entity.description, entity.start_date, entity.is_private, noteIds, bookmarkIds, attachmentIds);
 
         return TypedResults.CreatedAtRoute(response, "GetProjectById", new { id = response.Id });
     }
@@ -119,6 +120,7 @@ public static class CreateProjectEndpoint
         string Title,
         string? Description,
         DateTime? StartDate,
+        bool IsPrivate,
         IReadOnlyCollection<long>? NoteIds,
         IReadOnlyCollection<long>? BookmarkIds,
         IReadOnlyCollection<long>? AttachmentIds);
@@ -129,6 +131,7 @@ public static class CreateProjectEndpoint
         string Title,
         string? Description,
         DateTime StartDate,
+        bool IsPrivate,
         IReadOnlyCollection<long> NoteIds,
         IReadOnlyCollection<long> BookmarkIds,
         IReadOnlyCollection<long> AttachmentIds);

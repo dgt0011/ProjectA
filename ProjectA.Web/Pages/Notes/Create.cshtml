@@ -9,6 +9,7 @@
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
 <form method="post" class="col-md-8">
+    <input type="hidden" asp-for="ProjectId" />
     <div class="mb-3">
         <label asp-for="Form.Title" class="form-label"></label>
         <input asp-for="Form.Title" class="form-control" />
@@ -74,7 +75,14 @@
         <span asp-validation-for="Form.AttachmentIds" class="text-danger"></span>
     </div>
     <button type="submit" class="btn btn-primary">Create</button>
-    <a asp-page="Index" class="btn btn-link">Cancel</a>
+    @if (Model.ProjectId is { } projectId)
+    {
+        <a asp-page="/Projects/Details" asp-route-id="@projectId" class="btn btn-link">Cancel</a>
+    }
+    else
+    {
+        <a asp-page="Index" class="btn btn-link">Cancel</a>
+    }
 </form>
 
 @section Scripts {
