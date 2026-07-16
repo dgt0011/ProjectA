@@ -76,6 +76,8 @@ public class IndexModel(
         CategoryGroups = groups;
     }
 
+    public bool HasAnyBookmarks { get; set; }
+
     public async Task<IActionResult> OnPostDeleteAsync(long id, CancellationToken cancellationToken)
     {
         if (User.Identity?.IsAuthenticated != true)
