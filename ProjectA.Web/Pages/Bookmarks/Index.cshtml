@@ -71,15 +71,6 @@ else
                                                 <p class="card-text text-break">
                                                     <a href="@bookmark.Url" target="_blank" rel="noopener">@bookmark.Url</a>
                                                 </p>
-                                                @if (bookmark.CategoryIds.Count > 1)
-                                                {
-                                                    <p class="mb-0">
-                                                        @foreach (var categoryId in bookmark.CategoryIds)
-                                                        {
-                                                            <span class="badge bg-secondary me-1">@Model.CategoryTitle(categoryId)</span>
-                                                        }
-                                                    </p>
-                                                }
                                                 @{
                                                     // 5 segments over a 1-10 scale - each segment covers 2 rating points,
                                                     // so e.g. a rating of 7 or 8 fills exactly 4 of the 5 segments.
