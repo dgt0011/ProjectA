@@ -40,7 +40,17 @@ else
             <text>&middot; Last modified @modified.ToLocalTime().ToString("g")</text>
         }
     </p>
-
+    
+    @if (Model.AssociatedCategories.Count > 0)
+    {
+        <p>
+            @foreach (var category in Model.AssociatedCategories)
+            {
+                <span class="badge bg-secondary">@category.Title</span>
+            }
+        </p>        
+    }
+    
     <div class="collapse show note-collapse" id="note-collapse-main">
         @if (!string.IsNullOrWhiteSpace(Model.Note.Description))
         {

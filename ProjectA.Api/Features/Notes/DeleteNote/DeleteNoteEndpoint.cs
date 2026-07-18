@@ -3,6 +3,7 @@ using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Npgsql;
 using ProjectA.Api.Data;
+using ProjectA.Api.Features.Notes.UpdateNote;
 
 namespace ProjectA.Api.Features.Notes.DeleteNote;
 
@@ -42,6 +43,7 @@ public static class DeleteNoteEndpoint
                 transaction,
                 cancellationToken: cancellationToken));
 
+            await NoteCategoryLinks.ReplaceAsync(connection, transaction, (long)id, categoryIds: null, cancellationToken);
             await NoteBookmarkLinks.ReplaceAsync(connection, transaction, (long)id, bookmarkIds: null, cancellationToken);
             await NoteAttachmentLinks.ReplaceAsync(connection, transaction, (long)id, attachmentIds: null, cancellationToken);
 

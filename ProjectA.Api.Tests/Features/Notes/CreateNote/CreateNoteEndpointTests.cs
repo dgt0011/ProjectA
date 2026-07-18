@@ -49,7 +49,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithValidRequest_CreatesNoteAndReturnsCreated()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} New", "A short summary", "Some body text", null, false, null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} New", "A short summary", "Some body text", null, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -71,7 +71,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     public async Task Post_WithOnlyBody_Succeeds()
     {
         // Title is nullable in the schema; a body-only note should still be creatable.
-        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null, $"{TitlePrefix} body-only content", null, false, null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null, $"{TitlePrefix} body-only content", null, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -81,7 +81,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithNeitherTitleNorBody_ReturnsValidationProblem()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null, null, null, false, null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest(null, null, null, null, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -109,7 +109,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
         }
 
         var request = new CreateNoteEndpoint.CreateNoteRequest(
-            $"{TitlePrefix} Linked", null, null, null, false, [bookmarkId], [attachmentId]);
+            $"{TitlePrefix} Linked", null, null, null, false, [bookmarkId], [attachmentId], null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -124,7 +124,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithBookmarkIdThatDoesNotExist_ReturnsValidationProblem()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} BadBookmark", null, null, null, false, [999999], null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} BadBookmark", null, null, null, false, [999999], null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -138,7 +138,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithAttachmentIdThatDoesNotExist_ReturnsValidationProblem()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} BadAttachment", null, null, null, false, null, [999999]);
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} BadAttachment", null, null, null, false, null, [999999], null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -157,7 +157,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
             "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
             new { Title = $"{TitlePrefix} Parent" });
 
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} Child", null, null, parentId, false, null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} Child", null, null, parentId, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -171,7 +171,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithParentNoteIdThatDoesNotExist_ReturnsValidationProblem()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} BadParent", null, null, 999999, false, null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} BadParent", null, null, 999999, false, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 
@@ -185,7 +185,7 @@ public class CreateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Post_WithIsPrivateTrue_SetsPrivateFlag()
     {
-        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} Private", null, null, null, true, null, null);
+        var request = new CreateNoteEndpoint.CreateNoteRequest($"{TitlePrefix} Private", null, null, null, true, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/notes", request, JsonOptions);
 

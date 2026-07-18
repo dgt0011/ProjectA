@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using ProjectA.Api.Data;
+using ProjectA.Api.Features.Notes.UpdateNote;
 
 namespace ProjectA.Api.Features.Notes.GetNoteList;
 
@@ -37,7 +38,8 @@ public static class GetNoteListEndpoint
 
             var bookmarkIdsByNote = await NoteBookmarkLinks.GetBookmarkIdsForAllNotesAsync(connection, cancellationToken);
             var attachmentIdsByNote = await NoteAttachmentLinks.GetAttachmentIdsForAllNotesAsync(connection, cancellationToken);
-
+            var categoryIdsByNote = await NoteCategoryLinks.GetCategoryIdsForAllNotesAsync(connection, cancellationToken);
+            
             var items = entities
                 .Select(entity => new NoteListItemResponse(
                     entity.id,
@@ -49,7 +51,8 @@ public static class GetNoteListEndpoint
                     entity.date_created,
                     entity.date_modified,
                     bookmarkIdsByNote[entity.id].ToList(),
-                    attachmentIdsByNote[entity.id].ToList()))
+                    attachmentIdsByNote[entity.id].ToList(),
+                    categoryIdsByNote[entity.id].ToList()))
                 .ToList();
 
             return TypedResults.Ok(items);
@@ -72,5 +75,6 @@ public static class GetNoteListEndpoint
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,
-        IReadOnlyCollection<long> AttachmentIds);
+        IReadOnlyCollection<long> AttachmentIds,
+        IReadOnlyCollection<long> CategoryIds);
 }

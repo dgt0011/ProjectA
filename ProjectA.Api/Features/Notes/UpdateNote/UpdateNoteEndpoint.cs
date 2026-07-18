@@ -125,9 +125,28 @@ public static class UpdateNoteEndpoint
                 [nameof(request.AttachmentIds)] = ["One or more AttachmentIds do not refer to an existing attachment."]
             });
         }
+        
+        List<long> categoryIds;
+        try
+        {
+            // Null CategoryIds means "don't touch the associations" (same null-means-unchanged
+            // convention as Rating above); an explicit list, even empty, replaces them.
+            categoryIds = request.CategoryIds is not null
+                ? await NoteCategoryLinks.ReplaceAsync(connection, transaction, entity.id, request.CategoryIds, cancellationToken)
+                : await NoteCategoryLinks.GetCategoryIdsAsync(connection, entity.id, cancellationToken, transaction);
 
-        transaction.Commit();
+            transaction.Commit();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
 
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryIds)] = ["One or more CategoryIds do not refer to an existing category."]
+            });
+        }
+        
         var response = new NoteResponse(
             entity.id,
             entity.title,
@@ -138,7 +157,8 @@ public static class UpdateNoteEndpoint
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
-            attachmentIds);
+            attachmentIds,
+            categoryIds);
 
         return TypedResults.Ok(response);
     }
@@ -170,7 +190,8 @@ public static class UpdateNoteEndpoint
         long? ParentNoteId,
         bool IsPrivate,
         IReadOnlyCollection<long>? BookmarkIds,
-        IReadOnlyCollection<long>? AttachmentIds);
+        IReadOnlyCollection<long>? AttachmentIds,
+        IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
@@ -183,5 +204,6 @@ public static class UpdateNoteEndpoint
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,
-        IReadOnlyCollection<long> AttachmentIds);
+        IReadOnlyCollection<long> AttachmentIds,
+        IReadOnlyCollection<long> CategoryIds);
 }

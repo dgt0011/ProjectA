@@ -22,13 +22,14 @@ public class IndexModel(
     // Null when the bookmark has no BookmarkTypeId, or the type it referred to no longer
     // exists - callers treat both cases the same way (no icon, no row color).
     public BookmarkTypeDto? BookmarkType(long? bookmarkTypeId) =>
-        bookmarkTypeId is long id ? _bookmarkTypesById.GetValueOrDefault(id) : null;
+        bookmarkTypeId is { } id ? _bookmarkTypesById.GetValueOrDefault(id) : null;
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
         var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
         var bookmarkTypesTask = bookmarkTypesApiClient.GetListAsync(cancellationToken);
+        
         await Task.WhenAll(bookmarksTask, categoriesTask, bookmarkTypesTask);
 
         var bookmarksResult = await bookmarksTask;
@@ -53,6 +54,7 @@ public class IndexModel(
         // Every Category gets its own accordion section, even ones with no matching
         // Bookmarks - a Bookmark with more than one Category ends up listed under more than
         // one section, which is expected since CategoryIds is a many-to-many association.
+        
         var groups = categories
             .Select(category => new BookmarkCategoryGroup
             {
@@ -61,7 +63,9 @@ public class IndexModel(
                 Bookmarks = bookmarks.Where(bookmark => bookmark.CategoryIds.Contains(category.Id)).ToList()
             })
             .ToList();
-
+        
+        groups.Sort((a, b) => string.Compare(a.CategoryTitle, b.CategoryTitle, StringComparison.Ordinal));
+       
         var uncategorized = bookmarks.Where(bookmark => bookmark.CategoryIds.Count == 0).ToList();
         if (uncategorized.Count > 0)
         {

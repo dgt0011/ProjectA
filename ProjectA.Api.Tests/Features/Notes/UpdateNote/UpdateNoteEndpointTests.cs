@@ -58,7 +58,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithValidRequest_UpdatesAndReturnsOk()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", "Updated summary", "Updated body", null, false, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", "Updated summary", "Updated body", null, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -76,7 +76,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Missing", null, null, null, false, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Missing", null, null, null, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync("/api/notes/999999", request, JsonOptions);
 
@@ -87,7 +87,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithNeitherTitleNorBody_ReturnsValidationProblem()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest(null, null, null, null, false, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest(null, null, null, null, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -109,7 +109,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
                 new { NoteId = id, BookmarkId = bookmarkId });
         }
 
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, false, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -134,7 +134,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
                 new { NoteId = id, BookmarkId = bookmarkId });
         }
 
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, false, [], null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, false, [], null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -149,7 +149,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithAttachmentIdThatDoesNotExist_ReturnsValidationProblem()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, false, null, [999999]);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, false, null, [999999], null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -166,7 +166,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
             new { Title = $"{TitlePrefix} Parent" });
 
         var request = new UpdateNoteEndpoint.UpdateNoteRequest(
-            $"{TitlePrefix} Updated", null, "Updated body", parentId, false, null, null);
+            $"{TitlePrefix} Updated", null, "Updated body", parentId, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -182,7 +182,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     {
         var id = await SeedNoteAsync();
         var request = new UpdateNoteEndpoint.UpdateNoteRequest(
-            $"{TitlePrefix} Updated", null, "Updated body", 999999, false, null, null);
+            $"{TitlePrefix} Updated", null, "Updated body", 999999, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -197,7 +197,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithSelfAsParentNoteId_ReturnsValidationProblem()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", id, false, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", id, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 
@@ -221,7 +221,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
             new { Title = $"{TitlePrefix} Child", ParentNoteId = grandparentId });
 
         var request = new UpdateNoteEndpoint.UpdateNoteRequest(
-            $"{TitlePrefix} Updated", null, "Updated body", childId, false, null, null);
+            $"{TitlePrefix} Updated", null, "Updated body", childId, false, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{grandparentId}", request, JsonOptions);
 
@@ -236,7 +236,7 @@ public class UpdateNoteEndpointTests : IAsyncLifetime
     public async Task Put_WithIsPrivateTrue_SetsPrivateFlag()
     {
         var id = await SeedNoteAsync();
-        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, true, null, null);
+        var request = new UpdateNoteEndpoint.UpdateNoteRequest($"{TitlePrefix} Updated", null, "Updated body", null, true, null, null, null);
 
         var response = await _client.PutAsJsonAsync($"/api/notes/{id}", request, JsonOptions);
 

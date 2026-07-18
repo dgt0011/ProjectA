@@ -5,22 +5,35 @@ using ProjectA.Web.Services;
 
 namespace ProjectA.Web.Pages.Notes;
 
-public class IndexModel(INotesApiClient notesApiClient) : PageModel
+public class IndexModel(INotesApiClient notesApiClient, ICategoriesApiClient categoriesApiClient) : PageModel
 {
+    private Dictionary<long, string> _categoryTitlesById = [];
+    
     public List<NoteDto> Notes { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
+    
+    public string CategoryTitle(long categoryId) =>
+        _categoryTitlesById.GetValueOrDefault(categoryId, $"#{categoryId}");
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var result = await notesApiClient.GetListAsync(cancellationToken);
-        if (result.IsSuccess)
-        {
-            Notes = result.Value ?? [];
-        }
-        else
+        var notesTask = notesApiClient.GetListAsync(cancellationToken);
+        var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
+        
+        //TODO: This seems ... redundant?  We're awaiting the results of each task below anyway?
+        await Task.WhenAll(notesTask, categoriesTask);
+        
+        var notesResult = await notesTask;
+        
+        Notes = notesResult.IsSuccess ? notesResult.Value ?? [] : [];
+        if (!notesResult.IsSuccess)
         {
             LoadedSuccessfully = false;
         }
+        
+        var categoriesResult = await categoriesTask;
+        var categories = categoriesResult.IsSuccess ? categoriesResult.Value ?? [] : [];
+        _categoryTitlesById = categories.ToDictionary(category => category.Id, category => category.Title);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(long id, CancellationToken cancellationToken)

@@ -11,7 +11,8 @@ namespace ProjectA.Web.Pages.Notes;
 public class EditModel(
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
-    IAttachmentsApiClient attachmentsApiClient) : PageModel
+    IAttachmentsApiClient attachmentsApiClient,
+    ICategoriesApiClient categoriesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -22,6 +23,8 @@ public class EditModel(
     public List<NoteDto> AvailableParentNotes { get; set; } = [];
     public List<BookmarkDto> AvailableBookmarks { get; set; } = [];
     public List<AttachmentDto> AvailableAttachments { get; set; } = [];
+    
+    public List<CategoryDto> AvailableCategories { get; set; } = [];
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -40,7 +43,8 @@ public class EditModel(
             ParentNoteId = result.Value.ParentNoteId,
             IsPrivate = result.Value.IsPrivate,
             BookmarkIds = [.. result.Value.BookmarkIds],
-            AttachmentIds = [.. result.Value.AttachmentIds]
+            AttachmentIds = [.. result.Value.AttachmentIds],
+            CategoryIds = [.. result.Value.CategoryIds],
         };
 
         await LoadAssociationOptionsAsync(cancellationToken);
@@ -77,7 +81,9 @@ public class EditModel(
         var notesTask = notesApiClient.GetListAsync(cancellationToken);
         var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
         var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
-        await Task.WhenAll(notesTask, bookmarksTask, attachmentsTask);
+        var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
+        
+        await Task.WhenAll(notesTask, bookmarksTask, attachmentsTask, categoriesTask);
 
         var notesResult = await notesTask;
         if (notesResult.IsSuccess)
@@ -115,6 +121,12 @@ public class EditModel(
         if (attachmentsResult.IsSuccess)
         {
             AvailableAttachments = attachmentsResult.Value ?? [];
+        }
+        
+        var categoriesResult = await categoriesTask;
+        if (categoriesResult.IsSuccess)
+        {
+            AvailableCategories = categoriesResult.Value ?? [];
         }
     }
 }

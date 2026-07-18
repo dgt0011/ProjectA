@@ -25,10 +25,10 @@
                 }
             </div>
             <span class="text-muted small">
-                Created @note.DateCreated.ToLocalTime().ToString("g")
+                Created : @note.DateCreated.ToLocalTime().ToString("dd MMM yy")
                 @if (note.DateModified is { } modified)
                 {
-                    <text>&middot; Modified @modified.ToLocalTime().ToString("g")</text>
+                    <text>| Modified : @modified.ToLocalTime().ToString("dd MMM yy HH:mm")</text>
                 }
             </span>
         </div>

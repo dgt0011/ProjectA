@@ -43,7 +43,7 @@
         <label asp-for="Form.BookmarkIds" class="form-label"></label>
         @if (Model.AvailableBookmarks.Count == 0)
         {
-            <p class="text-muted">No referenceee bookmarks exist yet.</p>
+            <p class="text-muted">No reference bookmarks exist yet.</p>
         }
         else
         {
@@ -56,6 +56,7 @@
         }
         <span asp-validation-for="Form.BookmarkIds" class="text-danger"></span>
     </div>
+    
     <div class="mb-3">
         <label asp-for="Form.AttachmentIds" class="form-label"></label>
         @if (Model.AvailableAttachments.Count == 0)
@@ -73,6 +74,26 @@
         }
         <span asp-validation-for="Form.AttachmentIds" class="text-danger"></span>
     </div>
+    
+    <div class="mb-3">
+        <label asp-for="Form.CategoryIds" class="form-label"></label>
+        @if (Model.AvailableCategories.Count == 0)
+        {
+            <p class="text-muted">No categories exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.CategoryIds" class="form-select" multiple size="@Math.Min(Model.AvailableCategories.Count, 6)">
+                @foreach (var category in Model.AvailableCategories)
+                {
+                    <option value="@category.Id">@category.Title</option>
+                }
+            </select>
+            <div class="form-text">Usually just one - hold Ctrl (Windows) or Cmd (Mac) and click to select more than one.</div>
+        }
+        <span asp-validation-for="Form.CategoryIds" class="text-danger"></span>
+    </div>
+    
     <button type="submit" class="btn btn-primary">Save</button>
     <a asp-page="Index" class="btn btn-link">Cancel</a>
 </form>

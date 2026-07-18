@@ -14,7 +14,7 @@
 
 @if (!Model.LoadedSuccessfully)
 {
-    <div class="alert alert-warning">Could not load notes from the API.</div>
+    <div class="alert alert-warning">Could not load notes.</div>
 }
 else if (Model.Notes.Count == 0)
 {
@@ -22,47 +22,93 @@ else if (Model.Notes.Count == 0)
 }
 else
 {
+    <div class="bs-component">
+        @foreach (var note in Model.Notes)
+        {
+            <div class="row row-cols-1">
+                <div class="col">
+                    <div class="card h-100">
+                        <div class="card-body position-relative">
+                            @if (User.Identity?.IsAuthenticated == true)
+                            {
+                            <div class="position-absolute top-0 end-0 p-2">
+                                <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
+                                      onsubmit="return confirm('Delete this note?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </div>
+                            }
+                            <h5 class="card-title pe-5">
+                                <a asp-page="Details" asp-route-id="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</a>
+                                @if (note.IsPrivate)
+                                {
+                                    <span class="badge text-bg-secondary ms-1">Private</span>
+                                }
+                            </h5>
+                            <p class="card-text text-break">
+                                @note.Description
+                            </p>
+                            
+                            @if (note.CategoryIds.Count > 0)
+                            {
+                                <p>
+                                    @foreach (var id in note.CategoryIds)
+                                    {
+                                        <span class="badge bg-secondary">@Model.CategoryTitle(id)</span>
+                                    }
+                                </p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    
+    <!--
     <table class="table table-striped align-middle">
         <thead>
-            <tr>
-                <th>Title</th>
-                <th>Description</th>
-                <th>Bookmarks</th>
-                <th>Attachments</th>
-                <th>Last modified</th>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <th class="text-end">Actions</th>
-                }
-            </tr>
+        <tr>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Bookmarks</th>
+            <th>Attachments</th>
+            <th>Last modified</th>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <th class="text-end">Actions</th>
+            }
+        </tr>
         </thead>
         <tbody>
-            @foreach (var note in Model.Notes)
-            {
-                <tr>
-                    <td>
-                        <a asp-page="Details" asp-route-id="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</a>
-                        @if (note.IsPrivate)
-                        {
-                            <span class="badge text-bg-secondary ms-1">Private</span>
-                        }
-                    </td>
-                    <td class="text-muted">@note.Description</td>
-                    <td>@note.BookmarkIds.Count</td>
-                    <td>@note.AttachmentIds.Count</td>
-                    <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
-                    @if (User.Identity?.IsAuthenticated == true)
+        @foreach (var note in Model.Notes)
+        {
+            <tr>
+                <td>
+                    <a asp-page="Details" asp-route-id="@note.Id">@(string.IsNullOrWhiteSpace(note.Title) ? "(untitled note)" : note.Title)</a>
+                    @if (note.IsPrivate)
                     {
-                        <td class="text-end">
-                            <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
-                                  onsubmit="return confirm('Delete this note?');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                            </form>
-                        </td>
+                        <span class="badge text-bg-secondary ms-1">Private</span>
                     }
-                </tr>
-            }
+                </td>
+                <td class="text-muted">@note.Description</td>
+                <td>@note.BookmarkIds.Count</td>
+                <td>@note.AttachmentIds.Count</td>
+                <td>@((note.DateModified ?? note.DateCreated).ToLocalTime().ToString("g"))</td>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <td class="text-end">
+                        <a asp-page="Edit" asp-route-id="@note.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" asp-page-handler="Delete" asp-route-id="@note.Id" class="d-inline"
+                              onsubmit="return confirm('Delete this note?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                }
+            </tr>
+        }
         </tbody>
     </table>
+    -->
 }

@@ -13,7 +13,8 @@ public class DetailsModel(
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
     IAttachmentsApiClient attachmentsApiClient,
-    IBookmarkTypesApiClient bookmarkTypesApiClient) : PageModel
+    IBookmarkTypesApiClient bookmarkTypesApiClient,
+    ICategoriesApiClient categoriesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -25,6 +26,7 @@ public class DetailsModel(
     // page resolves CategoryIds to titles.
     public List<BookmarkDto> AssociatedBookmarks { get; set; } = [];
     public List<AttachmentDto> AssociatedAttachments { get; set; } = [];
+    public List<CategoryDto> AssociatedCategories { get; set; } = [];
 
     private Dictionary<long, BookmarkTypeDto> _bookmarkTypesById = [];
 
@@ -91,6 +93,18 @@ public class DetailsModel(
                 var attachmentIds = Note.AttachmentIds.ToHashSet();
                 AssociatedAttachments = (attachmentsResult.Value ?? [])
                     .Where(attachment => attachmentIds.Contains(attachment.Id))
+                    .ToList();
+            }
+        }
+        
+        if (Note.CategoryIds.Count > 0)
+        {
+            var categoriesResult = await categoriesApiClient.GetListAsync(cancellationToken);
+            if (categoriesResult.IsSuccess)
+            {
+                var categoryIds = Note.CategoryIds.ToHashSet();
+                AssociatedCategories = (categoriesResult.Value ?? [])
+                    .Where(category => categoryIds.Contains(category.Id))
                     .ToList();
             }
         }

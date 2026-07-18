@@ -12,6 +12,7 @@ public class CreateModel(
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
     IAttachmentsApiClient attachmentsApiClient,
+    ICategoriesApiClient categoriesApiClient,
     IProjectsApiClient projectsApiClient) : PageModel
 {
     // Set when this page is reached via the "Create note" button on a Project's Details page
@@ -27,6 +28,7 @@ public class CreateModel(
     public List<NoteDto> AvailableParentNotes { get; set; } = [];
     public List<BookmarkDto> AvailableBookmarks { get; set; } = [];
     public List<AttachmentDto> AvailableAttachments { get; set; } = [];
+    public List<CategoryDto> AvailableCategories { get; set; } = [];
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -100,7 +102,9 @@ public class CreateModel(
         var notesTask = notesApiClient.GetListAsync(cancellationToken);
         var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
         var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
-        await Task.WhenAll(notesTask, bookmarksTask, attachmentsTask);
+        var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
+
+        await Task.WhenAll(notesTask, bookmarksTask, attachmentsTask, categoriesTask);
 
         // A brand-new note can't yet be anyone's ancestor, so every existing note is a
         // valid parent choice here (unlike Edit, which excludes self/descendants).
@@ -120,6 +124,12 @@ public class CreateModel(
         if (attachmentsResult.IsSuccess)
         {
             AvailableAttachments = attachmentsResult.Value ?? [];
+        }
+        
+        var categoriesResult = await categoriesTask;
+        if (categoriesResult.IsSuccess)
+        {
+            AvailableCategories = categoriesResult.Value ?? [];
         }
     }
 }

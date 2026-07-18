@@ -70,7 +70,10 @@ public class EditModel(
         }
 
         TempData["SuccessMessage"] = "Project updated.";
-        return RedirectToPage("Index");
+        
+        //return RedirectToPage("Index");
+        
+        return RedirectToPage("/Index");
     }
 
     private async Task LoadAssociationOptionsAsync(CancellationToken cancellationToken)
