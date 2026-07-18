@@ -1,26 +1,56 @@
 @page
+@model ProjectA.Web.Pages.IndexModel
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Projects";
 }
 
-<div class="px-4 py-5 text-center">
-    <h1 class="display-5 fw-bold">ProjectA</h1>
-    <p class="col-lg-8 mx-auto text-muted">
-        Manage categories, bookmarks, attachments, ToDo items, notes and projects backed by
-        the ProjectA.Api service.
-    </p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Projects</h1>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-page="Create" class="btn btn-primary">Create project</a>
+    }
 </div>
 
-<div class="row g-4">
-    <div class="col-sm-6 col-lg-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Categories</h5>
-                <p class="card-text text-muted">Group bookmarks and notes under shared labels.</p>
-                <a asp-page="/Categories/Index" class="btn btn-primary">Manage categories</a>
+@if (!Model.LoadedSuccessfully)
+{
+    <div class="alert alert-warning">Could not load projects.</div>
+}
+else if (Model.Projects.Count == 0)
+{
+    <p class="text-muted">No projects yet.</p>
+}
+else
+{
+    <div class="row g-4">
+    
+        @foreach (var project in Model.Projects)
+        {
+                
+            <div class="col-sm-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            @project.Title
+                            @if (project.IsPrivate)
+                            {
+                                <span class="badge text-bg-secondary">Private</span>
+                            }
+                        </h5>
+                        <p class="card-text text-muted">@project.Description</p>
+                        <!-- <a asp-page="Details" asp-route-id="@project.Id" class="btn btn-primary">View</a> -->
+                        <a asp-page="Projects/Details" asp-route-id="@project.Id" class="btn btn-primary">View</a>
+                    </div>
+                </div>
             </div>
-        </div>
+        }
     </div>
+}
+
+
+<!--
+
+<div class="row g-4">
     <div class="col-sm-6 col-lg-4">
         <div class="card h-100">
             <div class="card-body">
@@ -36,15 +66,6 @@
                 <h5 class="card-title">Attachments</h5>
                 <p class="card-text text-muted">Track files stored in S3 by ARN.</p>
                 <a asp-page="/Attachments/Index" class="btn btn-primary">Manage attachments</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">ToDo items</h5>
-                <p class="card-text text-muted">Track outstanding and completed tasks.</p>
-                <a asp-page="/ToDo/Index" class="btn btn-primary">Manage ToDo items</a>
             </div>
         </div>
     </div>
@@ -67,3 +88,4 @@
         </div>
     </div>
 </div>
+-->

@@ -12,7 +12,9 @@ namespace ProjectA.Web.Pages.Notes;
 public class DetailsModel(
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
-    IAttachmentsApiClient attachmentsApiClient) : PageModel
+    IAttachmentsApiClient attachmentsApiClient,
+    IBookmarkTypesApiClient bookmarkTypesApiClient,
+    ICategoriesApiClient categoriesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -24,6 +26,21 @@ public class DetailsModel(
     // page resolves CategoryIds to titles.
     public List<BookmarkDto> AssociatedBookmarks { get; set; } = [];
     public List<AttachmentDto> AssociatedAttachments { get; set; } = [];
+    public List<CategoryDto> AssociatedCategories { get; set; } = [];
+
+    private Dictionary<long, BookmarkTypeDto> _bookmarkTypesById = [];
+
+    // Null when the bookmark has no BookmarkTypeId, or the type it referred to no longer
+    // exists - same helper/semantics as Bookmarks' own Index page (BookmarkType(...)) so the
+    // icon/row-color treatment stays identical wherever a bookmark is listed.
+    public BookmarkTypeDto? BookmarkType(long? bookmarkTypeId) =>
+        bookmarkTypeId is long id ? _bookmarkTypesById.GetValueOrDefault(id) : null;
+
+    // Built once from the full notes list so the recursive _NoteTreeItem partial can look up
+    // any note's direct children without re-fetching. Only Note's own descendants ever get
+    // rendered, but it's simplest to build the lookup for every note up front.
+    public IReadOnlyDictionary<long, List<NoteDto>> ChildrenByParentId { get; set; } =
+        new Dictionary<long, List<NoteDto>>();
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -36,15 +53,35 @@ public class DetailsModel(
 
         Note = result.Value;
 
+        var allNotesResult = await notesApiClient.GetListAsync(cancellationToken);
+        if (allNotesResult.IsSuccess)
+        {
+            ChildrenByParentId = (allNotesResult.Value ?? [])
+                .Where(note => note.ParentNoteId is not null)
+                .OrderBy(note => note.DateCreated)
+                .GroupBy(note => note.ParentNoteId!.Value)
+                .ToDictionary(group => group.Key, group => group.ToList());
+        }
+
         if (Note.BookmarkIds.Count > 0)
         {
-            var bookmarksResult = await bookmarksApiClient.GetListAsync(cancellationToken);
+            var bookmarksTask = bookmarksApiClient.GetListAsync(cancellationToken);
+            var bookmarkTypesTask = bookmarkTypesApiClient.GetListAsync(cancellationToken);
+            await Task.WhenAll(bookmarksTask, bookmarkTypesTask);
+
+            var bookmarksResult = await bookmarksTask;
             if (bookmarksResult.IsSuccess)
             {
                 var bookmarkIds = Note.BookmarkIds.ToHashSet();
                 AssociatedBookmarks = (bookmarksResult.Value ?? [])
                     .Where(bookmark => bookmarkIds.Contains(bookmark.Id))
                     .ToList();
+            }
+
+            var bookmarkTypesResult = await bookmarkTypesTask;
+            if (bookmarkTypesResult.IsSuccess)
+            {
+                _bookmarkTypesById = (bookmarkTypesResult.Value ?? []).ToDictionary(bookmarkType => bookmarkType.Id);
             }
         }
 
@@ -56,6 +93,18 @@ public class DetailsModel(
                 var attachmentIds = Note.AttachmentIds.ToHashSet();
                 AssociatedAttachments = (attachmentsResult.Value ?? [])
                     .Where(attachment => attachmentIds.Contains(attachment.Id))
+                    .ToList();
+            }
+        }
+        
+        if (Note.CategoryIds.Count > 0)
+        {
+            var categoriesResult = await categoriesApiClient.GetListAsync(cancellationToken);
+            if (categoriesResult.IsSuccess)
+            {
+                var categoryIds = Note.CategoryIds.ToHashSet();
+                AssociatedCategories = (categoriesResult.Value ?? [])
+                    .Where(category => categoryIds.Contains(category.Id))
                     .ToList();
             }
         }

@@ -2,6 +2,9 @@
 @model ProjectA.Web.Pages.Notes.DetailsModel
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Note?.Title) ? "Note" : Model.Note.Title;
+    var mainChildren = Model.Note is not null && Model.ChildrenByParentId.TryGetValue(Model.Note.Id, out var kids)
+        ? kids
+        : [];
 }
 
 @if (Model.Note is null)
@@ -11,63 +14,102 @@
 else
 {
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <h1>@(string.IsNullOrWhiteSpace(Model.Note.Title) ? "(untitled note)" : Model.Note.Title)</h1>
+        <div class="d-flex align-items-center">
+            <!--
+            <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#note-collapse-main" aria-expanded="true" aria-controls="note-collapse-main">
+                <span class="collapse-toggle-icon">&minus;</span>
+            </button>
+            -->
+            <h1 class="mb-0">@(string.IsNullOrWhiteSpace(Model.Note.Title) ? "(untitled note)" : Model.Note.Title)</h1>
+            @if (Model.Note.IsPrivate)
+            {
+                <span class="badge text-bg-secondary ms-2">Private</span>
+            }
+        </div>
         @if (User.Identity?.IsAuthenticated == true)
         {
             <a asp-page="Edit" asp-route-id="@Model.Note.Id" class="btn btn-outline-secondary">Edit</a>
         }
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(Model.Note.Description))
-    {
-        <p class="lead text-muted">@Model.Note.Description</p>
-    }
-
     <p class="text-muted small">
-        Last modified @((Model.Note.DateModified ?? Model.Note.DateCreated).ToLocalTime().ToString("g"))
+        Created @Model.Note.DateCreated.ToLocalTime().ToString("g")
+        @if (Model.Note.DateModified is { } modified)
+        {
+            <text>&middot; Last modified @modified.ToLocalTime().ToString("g")</text>
+        }
     </p>
-
-    <textarea id="note-body-raw" class="d-none">@Model.Note.Body</textarea>
-    <div id="note-body-rendered" class="border rounded p-3"></div>
-
-    <div class="mt-4">
-        <h2 class="h5">Bookmarks</h2>
-        @if (Model.AssociatedBookmarks.Count == 0)
+    
+    @if (Model.AssociatedCategories.Count > 0)
+    {
+        <p>
+            @foreach (var category in Model.AssociatedCategories)
+            {
+                <span class="badge bg-secondary">@category.Title</span>
+            }
+        </p>        
+    }
+    
+    <div class="collapse show note-collapse" id="note-collapse-main">
+        @if (!string.IsNullOrWhiteSpace(Model.Note.Description))
         {
-            <p class="text-muted">No bookmarks associated with this note.</p>
+            <p class="lead text-muted">@Model.Note.Description</p>
         }
-        else
+
+        <textarea id="note-body-raw" class="d-none">@Model.Note.Body</textarea>
+        <div id="note-body-rendered" class="border rounded p-3"></div>
+
+        @if (Model.AssociatedBookmarks.Count > 0)
         {
-            <ul class="list-group">
-                @foreach (var bookmark in Model.AssociatedBookmarks)
+            <div class="mt-4">
+                <h2 class="h5">References</h2>
+
+                <ul class="list-group">
+                    @foreach (var bookmark in Model.AssociatedBookmarks)
+                    {
+                        var bookmarkType = Model.BookmarkType(bookmark.BookmarkTypeId);
+                        <li class="list-group-item d-flex align-items-center"
+                            style="@(!string.IsNullOrWhiteSpace(bookmarkType?.Color) ? $"background-color: {bookmarkType.Color};" : "")">
+                            @if (bookmarkType is { HasIcon: true })
+                            {
+                                <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16"
+                                     title="@bookmarkType.Title" class="me-2" />
+                            }
+                            <a href="@bookmark.Url" target="_blank" rel="noopener">
+                                @(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (Model.AssociatedAttachments.Count > 0)
+        {
+            <div class="mt-4">
+                <h2 class="h5">Attachments</h2>
+                <ul class="list-group">
+                    @foreach (var attachment in Model.AssociatedAttachments)
+                    {
+                        <li class="list-group-item">
+                            @(string.IsNullOrWhiteSpace(attachment.Title) ? "(untitled attachment)" : attachment.Title)
+                            <code class="text-muted ms-2">@attachment.S3Arn</code>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (mainChildren.Count > 0)
+        {
+            <div class="mt-4">
+                <h2 class="h5">Child notes</h2>
+                @foreach (var child in mainChildren)
                 {
-                    <li class="list-group-item">
-                        <a href="@bookmark.Url" target="_blank" rel="noopener">
-                            @(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)
-                        </a>
-                    </li>
+                    <partial name="_NoteTreeItem" model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = 1 })" />
                 }
-            </ul>
-        }
-    </div>
-
-    <div class="mt-4">
-        <h2 class="h5">Attachments</h2>
-        @if (Model.AssociatedAttachments.Count == 0)
-        {
-            <p class="text-muted">No attachments associated with this note.</p>
-        }
-        else
-        {
-            <ul class="list-group">
-                @foreach (var attachment in Model.AssociatedAttachments)
-                {
-                    <li class="list-group-item">
-                        @(string.IsNullOrWhiteSpace(attachment.Title) ? "(untitled attachment)" : attachment.Title)
-                        <code class="text-muted ms-2">@attachment.S3Arn</code>
-                    </li>
-                }
-            </ul>
+            </div>
         }
     </div>
 
@@ -78,4 +120,5 @@ else
 
 @section Scripts {
     <partial name="_MarkdownViewerScripts" />
+    <partial name="_NoteTreeScripts" />
 }

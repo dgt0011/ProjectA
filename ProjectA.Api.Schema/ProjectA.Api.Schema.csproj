@@ -27,6 +27,12 @@
       <EmbeddedResource Include="Scripts\script006-AlterTable-Notes-Add-Description.sql" />
       <None Remove="Scripts\script007-CreateTable-BookmarkTypes.sql" />
       <EmbeddedResource Include="Scripts\script007-CreateTable-BookmarkTypes.sql" />
+      <None Remove="Scripts\script008-AlterTable-Notes-Add-ParentNoteId.sql" />
+      <EmbeddedResource Include="Scripts\script008-AlterTable-Notes-Add-ParentNoteId.sql" />
+      <None Remove="Scripts\script009-AlterTable-Notes-Add-IsPrivate.sql" />
+      <EmbeddedResource Include="Scripts\script009-AlterTable-Notes-Add-IsPrivate.sql" />
+      <None Remove="Scripts\script010-AlterTable-Projects-Add-IsPrivate.sql" />
+      <EmbeddedResource Include="Scripts\script010-AlterTable-Projects-Add-IsPrivate.sql" />
     </ItemGroup>
 
 </Project>

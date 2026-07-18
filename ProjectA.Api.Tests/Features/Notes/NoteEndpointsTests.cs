@@ -19,11 +19,13 @@ public class NoteEndpointsTests : IAsyncLifetime
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
+    private readonly HttpClient _anonymousClient;
     private readonly IDbConnectionFactory _connectionFactory;
 
     public NoteEndpointsTests(ApiFactory factory)
     {
         _client = factory.CreateAuthenticatedClient();
+        _anonymousClient = factory.CreateClient();
         _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
     }
 
@@ -137,5 +139,96 @@ public class NoteEndpointsTests : IAsyncLifetime
         var listItem = notes!.Single(n => n.Id == noteId);
         Assert.Equal([bookmarkId], listItem.BookmarkIds);
         Assert.Equal([attachmentId], listItem.AttachmentIds);
+    }
+
+    [Fact]
+    public async Task GetById_IncludesParentNoteId()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var parentId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title) VALUES (@Title) RETURNING id;",
+            new { Title = $"{TitlePrefix} Parent" });
+        var childId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, parent_note_id) VALUES (@Title, @ParentNoteId) RETURNING id;",
+            new { Title = $"{TitlePrefix} Child", ParentNoteId = parentId });
+
+        var response = await _client.GetAsync($"/api/notes/{childId}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var note = await response.Content.ReadFromJsonAsync<GetNoteByIdEndpoint.NoteResponse>(JsonOptions);
+        Assert.NotNull(note);
+        Assert.Equal(parentId, note.ParentNoteId);
+
+        var listResponse = await _client.GetAsync("/api/notes");
+        var notes = await listResponse.Content.ReadFromJsonAsync<List<GetNoteListEndpoint.NoteListItemResponse>>(JsonOptions);
+        var listItem = notes!.Single(n => n.Id == childId);
+        Assert.Equal(parentId, listItem.ParentNoteId);
+    }
+
+    [Fact]
+    public async Task GetList_AsAnonymous_ExcludesPrivateNotes()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var privateId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, is_private) VALUES (@Title, true) RETURNING id;",
+            new { Title = $"{TitlePrefix} Private" });
+        var publicId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, is_private) VALUES (@Title, false) RETURNING id;",
+            new { Title = $"{TitlePrefix} Public" });
+
+        var anonymousResponse = await _anonymousClient.GetAsync("/api/notes");
+        var anonymousNotes = await anonymousResponse.Content
+            .ReadFromJsonAsync<List<GetNoteListEndpoint.NoteListItemResponse>>(JsonOptions);
+        Assert.NotNull(anonymousNotes);
+        Assert.DoesNotContain(anonymousNotes, n => n.Id == privateId);
+        Assert.Contains(anonymousNotes, n => n.Id == publicId);
+
+        var authenticatedResponse = await _client.GetAsync("/api/notes");
+        var authenticatedNotes = await authenticatedResponse.Content
+            .ReadFromJsonAsync<List<GetNoteListEndpoint.NoteListItemResponse>>(JsonOptions);
+        Assert.NotNull(authenticatedNotes);
+        Assert.Contains(authenticatedNotes, n => n.Id == privateId);
+        Assert.Contains(authenticatedNotes, n => n.Id == publicId);
+    }
+
+    [Fact]
+    public async Task GetById_AsAnonymous_OnPrivateNote_ReturnsNotFound()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var privateId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, is_private) VALUES (@Title, true) RETURNING id;",
+            new { Title = $"{TitlePrefix} PrivateById" });
+
+        var anonymousResponse = await _anonymousClient.GetAsync($"/api/notes/{privateId}");
+        Assert.Equal(HttpStatusCode.NotFound, anonymousResponse.StatusCode);
+
+        var authenticatedResponse = await _client.GetAsync($"/api/notes/{privateId}");
+        Assert.Equal(HttpStatusCode.OK, authenticatedResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetList_AsAnonymous_ExcludesNonPrivateChildOfPrivateParent()
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        var privateParentId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, is_private) VALUES (@Title, true) RETURNING id;",
+            new { Title = $"{TitlePrefix} PrivateParent" });
+        // Not explicitly flagged private itself - it should still inherit privacy from its parent.
+        var childId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO notes (title, parent_note_id, is_private) VALUES (@Title, @ParentNoteId, false) RETURNING id;",
+            new { Title = $"{TitlePrefix} InheritingChild", ParentNoteId = privateParentId });
+
+        var anonymousListResponse = await _anonymousClient.GetAsync("/api/notes");
+        var anonymousNotes = await anonymousListResponse.Content
+            .ReadFromJsonAsync<List<GetNoteListEndpoint.NoteListItemResponse>>(JsonOptions);
+        Assert.NotNull(anonymousNotes);
+        Assert.DoesNotContain(anonymousNotes, n => n.Id == privateParentId);
+        Assert.DoesNotContain(anonymousNotes, n => n.Id == childId);
+
+        var anonymousByIdResponse = await _anonymousClient.GetAsync($"/api/notes/{childId}");
+        Assert.Equal(HttpStatusCode.NotFound, anonymousByIdResponse.StatusCode);
+
+        var authenticatedByIdResponse = await _client.GetAsync($"/api/notes/{childId}");
+        Assert.Equal(HttpStatusCode.OK, authenticatedByIdResponse.StatusCode);
     }
 }

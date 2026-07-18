@@ -47,12 +47,43 @@ public static class UpdateNoteEndpoint
             return notFound;
         }
 
+        // ParentNoteId is checked for cycles before it's ever handed to Postgres - the FK
+        // constraint alone guarantees the parent exists, but it has no way to know that
+        // "existing" parent isn't actually one of this note's own descendants, which would
+        // turn the tree into a loop.
+        if (request.ParentNoteId is { } parentNoteId &&
+            await NoteHierarchy.WouldCreateCycleAsync(connection, transaction, entity.id, parentNoteId, cancellationToken))
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.ParentNoteId)] = ["A note cannot be its own parent, or a descendant of itself."]
+            });
+        }
+
         entity.title = request.Title;
         entity.description = request.Description;
         entity.body = request.Body;
+        entity.parent_note_id = request.ParentNoteId;
+        entity.is_private = request.IsPrivate;
         entity.date_modified = DateTime.UtcNow;
 
-        var updated = await connection.UpdateAsync(entity, transaction);
+        bool updated;
+        try
+        {
+            updated = await connection.UpdateAsync(entity, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.ParentNoteId)] = ["ParentNoteId does not refer to an existing note."]
+            });
+        }
+
         if (!updated)
         {
             transaction.Rollback();
@@ -94,18 +125,40 @@ public static class UpdateNoteEndpoint
                 [nameof(request.AttachmentIds)] = ["One or more AttachmentIds do not refer to an existing attachment."]
             });
         }
+        
+        List<long> categoryIds;
+        try
+        {
+            // Null CategoryIds means "don't touch the associations" (same null-means-unchanged
+            // convention as Rating above); an explicit list, even empty, replaces them.
+            categoryIds = request.CategoryIds is not null
+                ? await NoteCategoryLinks.ReplaceAsync(connection, transaction, entity.id, request.CategoryIds, cancellationToken)
+                : await NoteCategoryLinks.GetCategoryIdsAsync(connection, entity.id, cancellationToken, transaction);
 
-        transaction.Commit();
+            transaction.Commit();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
 
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryIds)] = ["One or more CategoryIds do not refer to an existing category."]
+            });
+        }
+        
         var response = new NoteResponse(
             entity.id,
             entity.title,
             entity.description,
             entity.body,
+            entity.parent_note_id,
+            entity.is_private,
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
-            attachmentIds);
+            attachmentIds,
+            categoryIds);
 
         return TypedResults.Ok(response);
     }
@@ -124,13 +177,21 @@ public static class UpdateNoteEndpoint
         return errors;
     }
 
-    // Request body accepted by this endpoint - owned by this slice, not shared.
+    // Request body accepted by this endpoint - owned by this slice, not shared. ParentNoteId
+    // and IsPrivate are plain scalars (not collections) so, like Title/Description/Body,
+    // they're always overwritten outright rather than following the
+    // CategoryIds/BookmarkIds/AttachmentIds "null means unchanged" convention - the Web form's
+    // dropdown/checkbox always reflect the current selection, including "no parent"/"not
+    // private".
     public sealed record UpdateNoteRequest(
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
+        bool IsPrivate,
         IReadOnlyCollection<long>? BookmarkIds,
-        IReadOnlyCollection<long>? AttachmentIds);
+        IReadOnlyCollection<long>? AttachmentIds,
+        IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
@@ -138,8 +199,11 @@ public static class UpdateNoteEndpoint
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
+        bool IsPrivate,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,
-        IReadOnlyCollection<long> AttachmentIds);
+        IReadOnlyCollection<long> AttachmentIds,
+        IReadOnlyCollection<long> CategoryIds);
 }

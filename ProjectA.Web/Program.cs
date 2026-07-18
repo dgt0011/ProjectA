@@ -3,7 +3,16 @@ using ProjectA.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages();
+// Without this, MVC's implicit-required inference for non-nullable reference type properties
+// (enabled by this project's Nullable Reference Types context) treats every non-nullable
+// collection property - NoteInput.BookmarkIds/AttachmentIds, BookmarkInput.CategoryIds,
+// ProjectInput.NoteIds/BookmarkIds/AttachmentIds, etc. - as if it had [Required], even though
+// none of them are actually required (an empty selection is a perfectly valid, intentional
+// choice for all of these multi-selects). Suppressing it here restores the intended "these
+// associations are optional" behaviour everywhere, instead of patching each model one at a
+// time.
+builder.Services.AddRazorPages()
+    .AddMvcOptions(options => options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true);
 
 // BearerTokenHandler needs the current request's HttpContext (to read the signed-in user's
 // api_token claim) even though it runs inside HttpClient's pipeline, not a controller/page.

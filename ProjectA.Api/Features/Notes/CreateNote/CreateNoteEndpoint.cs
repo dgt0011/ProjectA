@@ -2,6 +2,7 @@ using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Npgsql;
 using ProjectA.Api.Data;
+using ProjectA.Api.Features.Notes.UpdateNote;
 
 namespace ProjectA.Api.Features.Notes.CreateNote;
 
@@ -13,7 +14,7 @@ public static class CreateNoteEndpoint
             .WithName("CreateNote")
             .WithSummary("Create a note")
             .WithDescription(
-                "Creates a new note, optionally associating it with existing bookmarks and/or attachments.")
+                "Creates a new note, optionally associating it with existing bookmarks, categories and/or attachments.")
             .RequireAuthorization();
     }
 
@@ -33,13 +34,30 @@ public static class CreateNoteEndpoint
             title = request.Title,
             description = request.Description,
             body = request.Body,
+            parent_note_id = request.ParentNoteId,
+            is_private = request.IsPrivate,
             date_created = DateTime.UtcNow
         };
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = connection.BeginTransaction();
 
-        await connection.InsertAsync(entity, transaction);
+        // A brand-new note can't yet be anyone's ancestor (nothing points to it until after
+        // this insert), so ParentNoteId only needs the existence check the FK constraint
+        // already gives us - no cycle check needed here (unlike UpdateNoteEndpoint).
+        try
+        {
+            await connection.InsertAsync(entity, transaction);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.ParentNoteId)] = ["ParentNoteId does not refer to an existing note."]
+            });
+        }
 
         List<long> bookmarkIds;
         try
@@ -72,7 +90,26 @@ public static class CreateNoteEndpoint
                 [nameof(request.AttachmentIds)] = ["One or more AttachmentIds do not refer to an existing attachment."]
             });
         }
+        
+        List<long> categoryIds;
+        try
+        {
+            categoryIds = await NoteCategoryLinks.ReplaceAsync(
+                connection, transaction, entity.id, request.CategoryIds, cancellationToken);
 
+            transaction.Commit();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            transaction.Rollback();
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryIds)] = ["One or more CategoryIds do not refer to an existing category."]
+            });
+        }
+        
+        //TODO: Is this required here?
         transaction.Commit();
 
         var response = new NoteResponse(
@@ -80,10 +117,13 @@ public static class CreateNoteEndpoint
             entity.title,
             entity.description,
             entity.body,
+            entity.parent_note_id,
+            entity.is_private,
             entity.date_created,
             entity.date_modified,
             bookmarkIds,
-            attachmentIds);
+            attachmentIds,
+            categoryIds);
 
         return TypedResults.CreatedAtRoute(response, "GetNoteById", new { id = response.Id });
     }
@@ -109,8 +149,11 @@ public static class CreateNoteEndpoint
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
+        bool IsPrivate,
         IReadOnlyCollection<long>? BookmarkIds,
-        IReadOnlyCollection<long>? AttachmentIds);
+        IReadOnlyCollection<long>? AttachmentIds,
+        IReadOnlyCollection<long>? CategoryIds);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record NoteResponse(
@@ -118,8 +161,11 @@ public static class CreateNoteEndpoint
         string? Title,
         string? Description,
         string? Body,
+        long? ParentNoteId,
+        bool IsPrivate,
         DateTime DateCreated,
         DateTime? DateModified,
         IReadOnlyCollection<long> BookmarkIds,
-        IReadOnlyCollection<long> AttachmentIds);
+        IReadOnlyCollection<long> AttachmentIds,
+        IReadOnlyCollection<long> CategoryIds);
 }

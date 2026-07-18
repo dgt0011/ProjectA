@@ -1,0 +1,48 @@
+@page
+@{
+    ViewData["Title"] = "Administration";
+}
+
+<div class="px-4 py-5 text-center">
+    <!--    
+    <h1 class="display-5 fw-bold">ProjectA</h1>
+    <p class="col-lg-8 mx-auto text-muted">
+        Manage categories, bookmarks, attachments, ToDo items, notes and projects backed by
+        the ProjectA.Api service.
+    </p>
+    -->
+</div>
+
+<div class="row g-4">
+    
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div class="col-sm-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">TODO Tasks</h5>
+                    <p class="card-text text-muted">Things to do when opportunity presents</p>
+                    <a asp-page="/ToDo/Index" class="btn btn-primary">Manage categories</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Reminders</h5>
+                    <p class="card-text text-muted">Things to do at a date and time</p>
+                    <a asp-page="/ToDo/Index" class="btn btn-primary">Manage Reminders</a>
+                </div>
+            </div>
+        </div>        
+        <div class="col-sm-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">QR Codes</h5>
+                    <p class="card-text text-muted">Manage QR Codes to Notes/Bookmarks</p>
+                    <a asp-page="/ToDo/Index" class="btn btn-primary">Manage QR Codes</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>

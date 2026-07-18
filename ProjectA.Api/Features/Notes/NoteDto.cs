@@ -14,6 +14,8 @@ internal sealed class NoteDto
     public string? title { get; set; }
     public string? description { get; set; }
     public string? body { get; set; }
+    public long? parent_note_id { get; set; }
+    public bool is_private { get; set; }
     public DateTime date_created { get; init; }
     public DateTime? date_modified { get; set; }
 }

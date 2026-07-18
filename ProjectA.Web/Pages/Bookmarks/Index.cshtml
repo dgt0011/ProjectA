@@ -14,72 +14,80 @@
 
 @if (!Model.LoadedSuccessfully)
 {
-    <div class="alert alert-warning">Could not load bookmarks from the API.</div>
+    <div class="alert alert-warning">Could not load bookmarks</div>
 }
-else if (Model.Bookmarks.Count == 0)
+else if (Model.CategoryGroups.Count == 0)
 {
     <p class="text-muted">No bookmarks yet.</p>
 }
 else
 {
-    <table class="table table-striped align-middle">
-        <thead>
-            <tr>
-                <th></th>
-                <th>Title</th>
-                <th>Url</th>
-                <th>Rating</th>
-                <th>Categories</th>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <th class="text-end">Actions</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var bookmark in Model.Bookmarks)
+    <div class="accordion" id="bookmarksAccordion">
+        @foreach (var group in Model.CategoryGroups)
+        {
+            var slug = group.CategoryId?.ToString() ?? "uncategorized";
+            var headingId = $"heading-{slug}";
+            var collapseId = $"collapse-{slug}";
+            
+            @if (group.Bookmarks.Count > 0)
             {
-                var bookmarkType = Model.BookmarkType(bookmark.BookmarkTypeId);
-                <tr style="@(!string.IsNullOrWhiteSpace(bookmarkType?.Color) ? $"background-color: {bookmarkType.Color};" : "")">
-                    <td>
-                        @if (bookmarkType is { HasIcon: true })
-                        {
-                            <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16" title="@bookmarkType.Title" />
-                        }
-                    </td>
-                    <td>@bookmark.Title</td>
-                    <td class="text-break"><a href="@bookmark.Url" target="_blank" rel="noopener">@bookmark.Url</a></td>
-                    <td>
-                        @{
-                            // 5 segments over a 1-10 scale - each segment covers 2 rating points,
-                            // so e.g. a rating of 7 or 8 fills exactly 4 of the 5 segments.
-                            var filledSegments = (bookmark.Rating + 1) / 2;
-                        }
-                        <div class="rating-bar" title="@bookmark.Rating / 10" aria-label="Rating: @bookmark.Rating out of 10">
-                            @for (var i = 1; i <= 5; i++)
-                            {
-                                <span class="rating-segment @(i <= filledSegments ? "filled" : "")"></span>
-                            }
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="@headingId">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
+                            @group.CategoryTitle
+                            <span class="badge bg-secondary ms-2">@group.Bookmarks.Count</span>
+                        </button>
+                    </h2>
+                    <div id="@collapseId" class="accordion-collapse collapse" aria-labelledby="@headingId">
+                        <div class="accordion-body">
+                            <div class="row row-cols-1 g-3">
+                                    @foreach (var bookmark in group.Bookmarks)
+                                    {
+                                        var bookmarkType = Model.BookmarkType(bookmark.BookmarkTypeId);
+                                        <div class="col">
+                                            <div class="card h-100" style="@(!string.IsNullOrWhiteSpace(bookmarkType?.Color) ? $"background-color: {bookmarkType.Color};" : "")">
+                                                <div class="card-body position-relative pb-5">
+                                                    @if (User.Identity?.IsAuthenticated == true)
+                                                    {
+                                                    <div class="position-absolute top-0 end-0 p-2">
+                                                        <a asp-page="Edit" asp-route-id="@bookmark.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                                        <form method="post" asp-page-handler="Delete" asp-route-id="@bookmark.Id" class="d-inline"
+                                                              onsubmit="return confirm('Delete this bookmark?');">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                                        </form>
+                                                    </div>
+                                                    }
+                                                    <h5 class="card-title pe-5">
+                                                        @if (bookmarkType is { HasIcon: true })
+                                                        {
+                                                        <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16" title="@bookmarkType.Title" class="me-1" />
+                                                        }
+                                                        @(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)
+                                                    </h5>
+                                                    <p class="card-text text-break">
+                                                        <a href="@bookmark.Url" target="_blank" rel="noopener">@bookmark.Url</a>
+                                                    </p>
+                                                    @{
+                                                            // 5 segments over a 1-10 scale - each segment covers 2 rating points,
+                                                            // so e.g. a rating of 7 or 8 fills exactly 4 of the 5 segments.
+                                                    var filledSegments = (bookmark.Rating + 1) / 2;
+                                                    }
+                                                    <div class="rating-bar position-absolute bottom-0 end-0 p-2" title="@bookmark.Rating / 10" aria-label="Rating: @bookmark.Rating out of 10">
+                                                        @for (var i = 1; i <= 5; i++)
+                                                        {
+                                                        <span class="rating-segment @(i <= filledSegments ? "filled" : "")"></span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                            </div>
                         </div>
-                    </td>
-                    <td>
-                        @foreach (var categoryId in bookmark.CategoryIds)
-                        {
-                            <span class="badge bg-secondary me-1">@Model.CategoryTitle(categoryId)</span>
-                        }
-                    </td>
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <td class="text-end">
-                            <a asp-page="Edit" asp-route-id="@bookmark.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@bookmark.Id" class="d-inline"
-                                  onsubmit="return confirm('Delete this bookmark?');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                            </form>
-                        </td>
-                    }
-                </tr>
+                    </div>
+                </div>                
             }
-        </tbody>
-    </table>
+        }
+    </div>
 }

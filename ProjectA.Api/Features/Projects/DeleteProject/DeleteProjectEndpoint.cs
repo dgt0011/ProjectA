@@ -12,7 +12,10 @@ public static class DeleteProjectEndpoint
         group.MapDelete("{id}", Handle)
             .WithName("DeleteProject")
             .WithSummary("Delete a project")
-            .WithDescription("Permanently removes a project by Id.")
+            .WithDescription(
+                "Permanently removes a project by Id. Any note, bookmark and attachment " +
+                "associations for this project are removed too, but the notes, bookmarks and " +
+                "attachments themselves are never touched.")
             .RequireAuthorization();
     }
 
@@ -22,16 +25,29 @@ public static class DeleteProjectEndpoint
         CancellationToken cancellationToken = default)
     {
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
 
         bool deleted;
         try
         {
-            deleted = await connection.DeleteAsync(new ProjectDto { id = (long)id });
+            // A project's Note, Bookmark and Attachment associations should never block, or
+            // be affected by, deleting the project - the project is the "owning" side of all
+            // three relationships (same direction as a note owning note_bookmarks/
+            // note_attachments), so only this project's own join rows are cleared here; the
+            // notes/bookmarks/attachments themselves are never touched.
+            await ProjectNoteLinks.ReplaceAsync(connection, transaction, (long)id, noteIds: null, cancellationToken);
+            await ProjectBookmarkLinks.ReplaceAsync(connection, transaction, (long)id, bookmarkIds: null, cancellationToken);
+            await ProjectAttachmentLinks.ReplaceAsync(connection, transaction, (long)id, attachmentIds: null, cancellationToken);
+
+            deleted = await connection.DeleteAsync(new ProjectDto { id = (long)id }, transaction);
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
         {
-            // project_bookmarks, project_attachments, project_notes and todos.project_id
-            // reference projects(id).
+            transaction.Rollback();
+
+            // todos.project_id is the only relationship that can still legitimately block
+            // deletion here - a ToDo referencing this project, the opposite direction from the
+            // three relationships exempted above.
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Project is in use",
@@ -41,6 +57,8 @@ public static class DeleteProjectEndpoint
 
         if (!deleted)
         {
+            transaction.Rollback();
+
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Project not found",
@@ -48,6 +66,7 @@ public static class DeleteProjectEndpoint
                 type: "https://tools.ietf.org/html/rfc7231#section-6.5.4");
         }
 
+        transaction.Commit();
         return TypedResults.NoContent();
     }
 }
