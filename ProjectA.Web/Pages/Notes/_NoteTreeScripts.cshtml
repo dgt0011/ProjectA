@@ -21,21 +21,24 @@
             });
         }
 
-        // Flips each collapse toggle button's +/- glyph in step with Bootstrap's own
-        // shown/hidden events, so the button always reflects the collapsed note's actual
-        // state (including when a note is collapsed by clicking its own toggle rather than
-        // some other element).
+        // Flips each collapse toggle button's icon (collapse.png while expanded, expand.png
+        // while collapsed) in step with Bootstrap's own shown/hidden events, so the button
+        // always reflects the note's actual state (including when a note is collapsed by
+        // clicking its own toggle rather than some other element).
         document.querySelectorAll('.note-collapse').forEach(function (collapseEl) {
-            var toggleButton = document.querySelector('[data-bs-target="#' + collapseEl.id + '"] .collapse-toggle-icon');
-            if (!toggleButton) {
+            var toggleButton = document.querySelector('[data-bs-target="#' + collapseEl.id + '"]');
+            var toggleIcon = toggleButton ? toggleButton.querySelector('.collapse-toggle-icon') : null;
+            if (!toggleButton || !toggleIcon) {
                 return;
             }
 
             collapseEl.addEventListener('shown.bs.collapse', function () {
-                toggleButton.innerHTML = '&minus;';
+                toggleIcon.src = toggleIcon.src.replace('expand.png', 'collapse.png');
+                toggleButton.setAttribute('aria-label', 'Collapse note');
             });
             collapseEl.addEventListener('hidden.bs.collapse', function () {
-                toggleButton.textContent = '+';
+                toggleIcon.src = toggleIcon.src.replace('collapse.png', 'expand.png');
+                toggleButton.setAttribute('aria-label', 'Expand note');
             });
         });
     });

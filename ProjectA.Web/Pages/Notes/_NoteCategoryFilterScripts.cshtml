@@ -1,0 +1,84 @@
+@* Client-side only: filters the already-rendered note cards on Notes/Index by the Category
+   tags the user picks from the Filter input's autocomplete (a <datalist>, populated server-side
+   with only the Categories actually used by a Note on this page). No round-trip to the server -
+   matching just toggles each .note-row's visibility based on its data-category-ids attribute.
+   A Note matches if it has ANY of the currently selected Categories (OR, not AND). *@
+<script>
+    (function () {
+        const input = document.getElementById('noteCategoryFilterInput');
+        if (!input) {
+            return;
+        }
+
+        const badgesContainer = document.getElementById('noteCategoryFilterBadges');
+        const noMatchMessage = document.getElementById('noNotesMatchFilterMessage');
+        const options = Array.from(document.querySelectorAll('#noteCategoryFilterOptions option'));
+        const rows = Array.from(document.querySelectorAll('.note-row[data-category-ids]'));
+
+        // id (string) -> title, in selection order
+        const selected = new Map();
+
+        function applyFilter() {
+            if (selected.size === 0) {
+                rows.forEach(row => row.classList.remove('d-none'));
+                noMatchMessage.classList.add('d-none');
+                return;
+            }
+
+            const selectedIds = Array.from(selected.keys());
+            let anyVisible = false;
+            rows.forEach(row => {
+                const rowIds = (row.dataset.categoryIds || '')
+                    .split(',')
+                    .map(id => id.trim())
+                    .filter(id => id.length > 0);
+                const matches = selectedIds.some(id => rowIds.includes(id));
+                row.classList.toggle('d-none', !matches);
+                anyVisible = anyVisible || matches;
+            });
+
+            noMatchMessage.classList.toggle('d-none', anyVisible);
+        }
+
+        function addBadge(id, title) {
+            if (selected.has(id)) {
+                return;
+            }
+            selected.set(id, title);
+
+            const badge = document.createElement('span');
+            badge.className = 'badge text-bg-primary d-inline-flex align-items-center gap-1';
+
+            const label = document.createElement('span');
+            label.textContent = title;
+            badge.appendChild(label);
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'btn-close btn-close-white';
+            removeButton.style.fontSize = '0.55rem';
+            removeButton.setAttribute('aria-label', `Remove ${title} filter`);
+            removeButton.addEventListener('click', () => {
+                selected.delete(id);
+                badge.remove();
+                applyFilter();
+            });
+            badge.appendChild(removeButton);
+
+            badgesContainer.appendChild(badge);
+            applyFilter();
+        }
+
+        // <datalist> options don't fire their own "selected" event - the browser just sets
+        // the input's value to the option text (whether picked from the dropdown or typed by
+        // hand) and fires this same "input" event either way. Matching the value against the
+        // known option titles is what tells the two cases apart from a plain keystroke.
+        input.addEventListener('input', () => {
+            const match = options.find(option => option.value.toLowerCase() === input.value.trim().toLowerCase());
+            if (match) {
+                addBadge(match.dataset.id, match.value);
+                input.value = '';
+            }
+        });
+    })();
+</script>
