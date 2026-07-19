@@ -22,10 +22,29 @@ else if (Model.Notes.Count == 0)
 }
 else
 {
+    @if (Model.UsedCategories.Count > 0)
+    {
+        <div class="mb-3">
+            <label for="noteCategoryFilterInput" class="form-label">Filter</label>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <input type="text" id="noteCategoryFilterInput" class="form-control" style="max-width: 260px;"
+                       list="noteCategoryFilterOptions" autocomplete="off" placeholder="Type a category name..." />
+                <datalist id="noteCategoryFilterOptions">
+                    @foreach (var category in Model.UsedCategories)
+                    {
+                        <option data-id="@category.Id" value="@category.Title"></option>
+                    }
+                </datalist>
+                <div id="noteCategoryFilterBadges" class="d-flex flex-wrap gap-1"></div>
+            </div>
+        </div>
+        <p id="noNotesMatchFilterMessage" class="text-muted d-none">No notes match the selected categories.</p>
+    }
+
     <div class="bs-component">
         @foreach (var note in Model.Notes)
         {
-            <div class="row row-cols-1">
+            <div class="row row-cols-1 note-row" data-category-ids="@string.Join(",", note.CategoryIds)">
                 <div class="col">
                     <div class="card h-100">
                         <div class="card-body position-relative">
@@ -49,7 +68,7 @@ else
                             <p class="card-text text-break">
                                 @note.Description
                             </p>
-                            
+
                             @if (note.CategoryIds.Count > 0)
                             {
                                 <p>
@@ -111,4 +130,8 @@ else
         </tbody>
     </table>
     -->
+}
+
+@section Scripts {
+    <partial name="_NoteCategoryFilterScripts" />
 }
