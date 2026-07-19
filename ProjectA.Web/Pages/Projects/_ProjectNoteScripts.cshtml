@@ -23,20 +23,23 @@
             });
         }
 
-        // Each Note card starts collapsed (+); flips to - while expanded, in step with
-        // Bootstrap's own shown/hidden events, so the toggle button always reflects the
-        // Note's actual state.
+        // Each Note card starts collapsed (expand.png); swaps to collapse.png while expanded,
+        // in step with Bootstrap's own shown/hidden events, so the toggle icon always reflects
+        // the Note's actual state.
         document.querySelectorAll('.project-note-collapse').forEach(function (collapseEl) {
-            var toggleButton = document.querySelector('[data-bs-target="#' + collapseEl.id + '"] .collapse-toggle-icon');
-            if (!toggleButton) {
+            var toggleButton = document.querySelector('[data-bs-target="#' + collapseEl.id + '"]');
+            var toggleIcon = toggleButton ? toggleButton.querySelector('.collapse-toggle-icon') : null;
+            if (!toggleButton || !toggleIcon) {
                 return;
             }
 
             collapseEl.addEventListener('shown.bs.collapse', function () {
-                toggleButton.innerHTML = '&minus;';                
+                toggleIcon.src = toggleIcon.src.replace('expand.png', 'collapse.png');
+                toggleButton.setAttribute('aria-label', 'Collapse note');
             });
             collapseEl.addEventListener('hidden.bs.collapse', function () {
-                toggleButton.textContent = '+';
+                toggleIcon.src = toggleIcon.src.replace('collapse.png', 'expand.png');
+                toggleButton.setAttribute('aria-label', 'Expand note');
             });
         });
     });
