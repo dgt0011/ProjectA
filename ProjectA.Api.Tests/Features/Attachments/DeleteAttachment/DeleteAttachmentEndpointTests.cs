@@ -43,7 +43,7 @@ public class DeleteAttachmentEndpointTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         return await connection.QuerySingleAsync<long>(
-            "INSERT INTO attachments (title, s3_arn) VALUES (@Title, 'arn:aws:s3:::bucket/x') RETURNING id;",
+            "INSERT INTO attachments (title, file_path) VALUES (@Title, '/files/x.pdf') RETURNING id;",
             new { Title = $"{TitlePrefix} {suffix}" });
     }
 

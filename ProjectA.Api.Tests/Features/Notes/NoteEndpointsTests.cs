@@ -116,7 +116,7 @@ public class NoteEndpointsTests : IAsyncLifetime
                 "INSERT INTO bookmarks (url) VALUES (@Url) RETURNING id;",
                 new { Url = LinkedBookmarkUrl });
             attachmentId = await connection.QuerySingleAsync<long>(
-                "INSERT INTO attachments (title, s3_arn) VALUES (@Title, 'arn:aws:s3:::test/bucket') RETURNING id;",
+                "INSERT INTO attachments (title, file_path) VALUES (@Title, '/files/test.pdf') RETURNING id;",
                 new { Title = LinkedAttachmentTitle });
             await connection.ExecuteAsync(
                 "INSERT INTO note_bookmarks (note_id, bookmark_id) VALUES (@NoteId, @BookmarkId);",

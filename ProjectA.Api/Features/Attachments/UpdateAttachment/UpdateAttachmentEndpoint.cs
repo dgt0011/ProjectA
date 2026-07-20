@@ -11,7 +11,7 @@ public static class UpdateAttachmentEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateAttachment")
             .WithSummary("Update an attachment")
-            .WithDescription("Replaces an existing attachment's title, description and S3 reference.")
+            .WithDescription("Replaces an existing attachment's title, description and file reference.")
             .RequireAuthorization();
     }
 
@@ -43,7 +43,7 @@ public static class UpdateAttachmentEndpoint
 
         entity.title = request.Title;
         entity.description = request.Description;
-        entity.s3_arn = request.S3Arn;
+        entity.file_path = request.FilePath;
         entity.date_modified = DateTime.UtcNow;
 
         var updated = await connection.UpdateAsync(entity);
@@ -56,7 +56,7 @@ public static class UpdateAttachmentEndpoint
             entity.id,
             entity.title,
             entity.description,
-            entity.s3_arn,
+            entity.file_path,
             entity.date_created,
             entity.date_modified);
 
@@ -67,23 +67,23 @@ public static class UpdateAttachmentEndpoint
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (string.IsNullOrWhiteSpace(request.S3Arn))
+        if (string.IsNullOrWhiteSpace(request.FilePath))
         {
-            errors[nameof(request.S3Arn)] = ["S3Arn is required."];
+            errors[nameof(request.FilePath)] = ["FilePath is required."];
         }
 
         return errors;
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateAttachmentRequest(string? Title, string? Description, string S3Arn);
+    public sealed record UpdateAttachmentRequest(string? Title, string? Description, string FilePath);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record AttachmentResponse(
         long Id,
         string? Title,
         string? Description,
-        string S3Arn,
+        string FilePath,
         DateTime DateCreated,
         DateTime? DateModified);
 }

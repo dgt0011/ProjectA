@@ -88,7 +88,7 @@
             <select asp-for="Form.AttachmentIds" class="form-select" multiple size="@Math.Min(Model.AvailableAttachments.Count, 6)">
                 @foreach (var attachment in Model.AvailableAttachments)
                 {
-                    <option value="@attachment.Id">@(string.IsNullOrWhiteSpace(attachment.Title) ? attachment.S3Arn : attachment.Title)</option>
+                    <option value="@attachment.Id">@(string.IsNullOrWhiteSpace(attachment.Title) ? attachment.FilePath : attachment.Title)</option>
                 }
             </select>
         }

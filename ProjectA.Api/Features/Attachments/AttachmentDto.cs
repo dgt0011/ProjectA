@@ -13,7 +13,7 @@ internal sealed class AttachmentDto
     public long id { get; init; }
     public string? title { get; set; }
     public string? description { get; set; }
-    public string s3_arn { get; set; } = string.Empty;
+    public string file_path { get; set; } = string.Empty;
     public DateTime date_created { get; init; }
     public DateTime? date_modified { get; set; }
 }

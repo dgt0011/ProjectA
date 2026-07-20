@@ -29,7 +29,7 @@ public class EditModel(IAttachmentsApiClient attachmentsApiClient) : PageModel
         {
             Title = result.Value.Title,
             Description = result.Value.Description,
-            S3Arn = result.Value.S3Arn
+            FilePath = result.Value.FilePath
         };
         return Page();
     }

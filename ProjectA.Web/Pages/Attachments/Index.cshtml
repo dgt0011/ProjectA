@@ -27,7 +27,7 @@ else
             <tr>
                 <th>Title</th>
                 <th>Description</th>
-                <th>S3 ARN</th>
+                <th>File</th>
                 <th>Created</th>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
@@ -41,7 +41,7 @@ else
                 <tr>
                     <td>@attachment.Title</td>
                     <td>@attachment.Description</td>
-                    <td class="text-break"><code>@attachment.S3Arn</code></td>
+                    <td class="text-break"><a href="@attachment.FilePath" target="_blank" rel="noopener">@attachment.FilePath</a></td>
                     <td>@attachment.DateCreated.ToLocalTime().ToString("g")</td>
                     @if (User.Identity?.IsAuthenticated == true)
                     {

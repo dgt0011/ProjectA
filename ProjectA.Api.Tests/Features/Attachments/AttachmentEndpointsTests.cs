@@ -43,7 +43,7 @@ public class AttachmentEndpointsTests : IAsyncLifetime
         using (var connection = await _connectionFactory.CreateConnectionAsync())
         {
             await connection.ExecuteAsync(
-                "INSERT INTO attachments (title, s3_arn) VALUES (@TitleA, 'arn:aws:s3:::bucket/a'), (@TitleB, 'arn:aws:s3:::bucket/b');",
+                "INSERT INTO attachments (title, file_path) VALUES (@TitleA, '/files/a.pdf'), (@TitleB, '/files/b.pdf');",
                 new { TitleA = $"{TitlePrefix} A", TitleB = $"{TitlePrefix} B" });
         }
 
@@ -57,8 +57,8 @@ public class AttachmentEndpointsTests : IAsyncLifetime
 
         var seeded = attachments.Where(a => a.Title != null && a.Title.StartsWith(TitlePrefix)).ToList();
         Assert.Equal(2, seeded.Count);
-        Assert.Contains(seeded, a => a.Title == $"{TitlePrefix} A" && a.S3Arn == "arn:aws:s3:::bucket/a");
-        Assert.Contains(seeded, a => a.Title == $"{TitlePrefix} B" && a.S3Arn == "arn:aws:s3:::bucket/b");
+        Assert.Contains(seeded, a => a.Title == $"{TitlePrefix} A" && a.FilePath == "/files/a.pdf");
+        Assert.Contains(seeded, a => a.Title == $"{TitlePrefix} B" && a.FilePath == "/files/b.pdf");
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class AttachmentEndpointsTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         var id = await connection.QuerySingleAsync<long>(
-            "INSERT INTO attachments (title, s3_arn) VALUES (@Title, 'arn:aws:s3:::bucket/byid') RETURNING id;",
+            "INSERT INTO attachments (title, file_path) VALUES (@Title, '/files/byid.pdf') RETURNING id;",
             new { Title = $"{TitlePrefix} ById" });
 
         var response = await _client.GetAsync($"/api/attachments/{id}");
@@ -77,7 +77,7 @@ public class AttachmentEndpointsTests : IAsyncLifetime
             .ReadFromJsonAsync<GetAttachmentByIdEndpoint.AttachmentResponse>(JsonOptions);
         Assert.NotNull(attachment);
         Assert.Equal(id, attachment.Id);
-        Assert.Equal("arn:aws:s3:::bucket/byid", attachment.S3Arn);
+        Assert.Equal("/files/byid.pdf", attachment.FilePath);
     }
 
     [Fact]

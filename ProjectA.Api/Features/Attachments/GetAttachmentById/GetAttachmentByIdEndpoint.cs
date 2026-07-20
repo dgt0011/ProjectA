@@ -30,7 +30,7 @@ public static class GetAttachmentByIdEndpoint
                     entity.id,
                     entity.title,
                     entity.description,
-                    entity.s3_arn,
+                    entity.file_path,
                     entity.date_created,
                     entity.date_modified);
 
@@ -54,7 +54,7 @@ public static class GetAttachmentByIdEndpoint
         long Id,
         string? Title,
         string? Description,
-        string S3Arn,
+        string FilePath,
         DateTime DateCreated,
         DateTime? DateModified);
 }

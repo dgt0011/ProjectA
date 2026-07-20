@@ -40,7 +40,7 @@ public class CreateAttachmentEndpointTests : IAsyncLifetime
     public async Task Post_WithValidRequest_CreatesAttachmentAndReturnsCreated()
     {
         var request = new CreateAttachmentEndpoint.CreateAttachmentRequest(
-            $"{TitlePrefix} New", "A description", "arn:aws:s3:::bucket/new");
+            $"{TitlePrefix} New", "A description", "/files/new.pdf");
 
         var response = await _client.PostAsJsonAsync("/api/attachments", request, JsonOptions);
 
@@ -51,13 +51,13 @@ public class CreateAttachmentEndpointTests : IAsyncLifetime
         Assert.NotNull(created);
         Assert.True(created.Id > 0);
         Assert.Contains($"/api/attachments/{created.Id}", response.Headers.Location!.ToString());
-        Assert.Equal("arn:aws:s3:::bucket/new", created.S3Arn);
+        Assert.Equal("/files/new.pdf", created.FilePath);
     }
 
     [Fact]
-    public async Task Post_WithMissingS3Arn_ReturnsValidationProblem()
+    public async Task Post_WithMissingFilePath_ReturnsValidationProblem()
     {
-        var request = new CreateAttachmentEndpoint.CreateAttachmentRequest($"{TitlePrefix} NoArn", null, " ");
+        var request = new CreateAttachmentEndpoint.CreateAttachmentRequest($"{TitlePrefix} NoPath", null, " ");
 
         var response = await _client.PostAsJsonAsync("/api/attachments", request, JsonOptions);
 
@@ -65,7 +65,7 @@ public class CreateAttachmentEndpointTests : IAsyncLifetime
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
         Assert.NotNull(problem);
-        Assert.True(problem.Errors.ContainsKey("S3Arn"));
+        Assert.True(problem.Errors.ContainsKey("FilePath"));
     }
 
     private sealed record ValidationProblemResponse(

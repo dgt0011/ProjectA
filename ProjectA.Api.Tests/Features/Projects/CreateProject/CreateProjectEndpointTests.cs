@@ -76,7 +76,7 @@ public class CreateProjectEndpointTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         return await connection.QuerySingleAsync<long>(
-            "INSERT INTO attachments (title, s3_arn) VALUES (@Title, 'arn:aws:s3:::bucket/key') RETURNING id;",
+            "INSERT INTO attachments (title, file_path) VALUES (@Title, '/files/key.pdf') RETURNING id;",
             new { Title = $"{TitlePrefix} {suffix}" });
     }
 

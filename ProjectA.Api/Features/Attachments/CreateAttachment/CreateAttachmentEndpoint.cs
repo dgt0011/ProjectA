@@ -11,7 +11,7 @@ public static class CreateAttachmentEndpoint
         group.MapPost("", Handle)
             .WithName("CreateAttachment")
             .WithSummary("Create an attachment")
-            .WithDescription("Creates a new attachment record pointing at an S3 object.")
+            .WithDescription("Creates a new attachment record pointing at a locally-stored file.")
             .RequireAuthorization();
     }
 
@@ -30,7 +30,7 @@ public static class CreateAttachmentEndpoint
         {
             title = request.Title,
             description = request.Description,
-            s3_arn = request.S3Arn,
+            file_path = request.FilePath,
             date_created = DateTime.UtcNow
         };
 
@@ -41,7 +41,7 @@ public static class CreateAttachmentEndpoint
             entity.id,
             entity.title,
             entity.description,
-            entity.s3_arn,
+            entity.file_path,
             entity.date_created,
             entity.date_modified);
 
@@ -52,23 +52,23 @@ public static class CreateAttachmentEndpoint
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (string.IsNullOrWhiteSpace(request.S3Arn))
+        if (string.IsNullOrWhiteSpace(request.FilePath))
         {
-            errors[nameof(request.S3Arn)] = ["S3Arn is required."];
+            errors[nameof(request.FilePath)] = ["FilePath is required."];
         }
 
         return errors;
     }
 
     // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateAttachmentRequest(string? Title, string? Description, string S3Arn);
+    public sealed record CreateAttachmentRequest(string? Title, string? Description, string FilePath);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record AttachmentResponse(
         long Id,
         string? Title,
         string? Description,
-        string S3Arn,
+        string FilePath,
         DateTime DateCreated,
         DateTime? DateModified);
 }

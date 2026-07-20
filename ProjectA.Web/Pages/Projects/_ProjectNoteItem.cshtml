@@ -77,7 +77,7 @@
                         {
                             <li class="list-group-item">
                                 @(string.IsNullOrWhiteSpace(attachment.Title) ? "(untitled attachment)" : attachment.Title)
-                                <code class="text-muted ms-2">@attachment.S3Arn</code>
+                                <a href="@attachment.FilePath" target="_blank" rel="noopener" class="ms-2">@attachment.FilePath</a>
                             </li>
                         }
                     </ul>

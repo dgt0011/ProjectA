@@ -33,6 +33,8 @@
       <EmbeddedResource Include="Scripts\script009-AlterTable-Notes-Add-IsPrivate.sql" />
       <None Remove="Scripts\script010-AlterTable-Projects-Add-IsPrivate.sql" />
       <EmbeddedResource Include="Scripts\script010-AlterTable-Projects-Add-IsPrivate.sql" />
+      <None Remove="Scripts\script011-AlterTable-Attachments-Rename-S3Arn-To-FilePath.sql" />
+      <EmbeddedResource Include="Scripts\script011-AlterTable-Attachments-Rename-S3Arn-To-FilePath.sql" />
     </ItemGroup>
 
 </Project>

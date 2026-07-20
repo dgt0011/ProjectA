@@ -40,8 +40,8 @@ public class UpdateAttachmentEndpointTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         return await connection.QuerySingleAsync<long>(
-            "INSERT INTO attachments (title, description, s3_arn) " +
-            "VALUES (@Title, 'Original description', 'arn:aws:s3:::bucket/original') RETURNING id;",
+            "INSERT INTO attachments (title, description, file_path) " +
+            "VALUES (@Title, 'Original description', '/files/original.pdf') RETURNING id;",
             new { Title = $"{TitlePrefix} Original" });
     }
 
@@ -50,7 +50,7 @@ public class UpdateAttachmentEndpointTests : IAsyncLifetime
     {
         var id = await SeedAttachmentAsync();
         var request = new UpdateAttachmentEndpoint.UpdateAttachmentRequest(
-            $"{TitlePrefix} Updated", "Updated description", "arn:aws:s3:::bucket/updated");
+            $"{TitlePrefix} Updated", "Updated description", "/files/updated.pdf");
 
         var response = await _client.PutAsJsonAsync($"/api/attachments/{id}", request, JsonOptions);
 
@@ -59,14 +59,14 @@ public class UpdateAttachmentEndpointTests : IAsyncLifetime
         var updated = await response.Content.ReadFromJsonAsync<UpdateAttachmentEndpoint.AttachmentResponse>(JsonOptions);
         Assert.NotNull(updated);
         Assert.Equal(id, updated.Id);
-        Assert.Equal("arn:aws:s3:::bucket/updated", updated.S3Arn);
+        Assert.Equal("/files/updated.pdf", updated.FilePath);
         Assert.NotNull(updated.DateModified);
     }
 
     [Fact]
     public async Task Put_WhenIdDoesNotExist_ReturnsProblemDetails()
     {
-        var request = new UpdateAttachmentEndpoint.UpdateAttachmentRequest(null, null, "arn:aws:s3:::bucket/missing");
+        var request = new UpdateAttachmentEndpoint.UpdateAttachmentRequest(null, null, "/files/missing.pdf");
 
         var response = await _client.PutAsJsonAsync("/api/attachments/999999", request, JsonOptions);
 
@@ -74,7 +74,7 @@ public class UpdateAttachmentEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Put_WithMissingS3Arn_ReturnsValidationProblem()
+    public async Task Put_WithMissingFilePath_ReturnsValidationProblem()
     {
         var id = await SeedAttachmentAsync();
         var request = new UpdateAttachmentEndpoint.UpdateAttachmentRequest(null, null, " ");
