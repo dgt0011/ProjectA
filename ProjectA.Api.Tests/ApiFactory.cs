@@ -143,6 +143,25 @@ public sealed class ApiFactory : WebApplicationFactory<IApiMarker>, IAsyncLifeti
     public async Task InitializeAsync()
     {
         await _postgresDbContainer.StartAsync();
+
+        // Program.cs's own top-level code (added so the real API also runs migrations on
+        // startup, not just this test factory) reads ConnectionStrings:DefaultConnection via
+        // builder.Configuration and calls Upgrader.Upgrade(...) with it *before*
+        // WebApplicationFactory's ConfigureWebHost/ConfigureAppConfiguration hooks below ever
+        // run - those are only applied once something first triggers the deferred host build
+        // (e.g. CreateClient()), which happens later, after every test class's constructor
+        // calls into this factory. That means the AddInMemoryCollection override further down
+        // is too late to affect that particular read - it only affects configuration resolved
+        // after the host is built (e.g. the ConfigureTestServices IDbConnectionFactory swap).
+        // Environment variables, by contrast, are picked up by WebApplicationBuilder.CreateBuilder
+        // itself, at the very first line of Program.cs, so setting one here - before anything
+        // below triggers host construction - is what actually gets the Testcontainers
+        // connection string in front of Program.cs's own Upgrader.Upgrade call. Without this,
+        // Program.cs falls back to whatever DefaultConnection happens to be committed in
+        // appsettings.json, which won't match this container's dynamically-generated
+        // credentials and fails with a Postgres authentication error at host startup.
+        var connectionString = _postgresDbContainer.GetConnectionString() + ";GSS Encryption Mode=Disable";
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", connectionString);
     }
 
     async Task IAsyncLifetime.DisposeAsync()
