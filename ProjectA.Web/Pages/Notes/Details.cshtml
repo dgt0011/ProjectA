@@ -92,7 +92,14 @@ else
                 <ul class="list-group">
                     @foreach (var attachment in Model.AssociatedAttachments)
                     {
-                        <li class="list-group-item">
+                        var attachmentType = Model.AttachmentType(attachment.AttachmentTypeId);
+                        <li class="list-group-item d-flex align-items-center"
+                            style="@(!string.IsNullOrWhiteSpace(attachmentType?.Color) ? $"background-color: {attachmentType.Color};" : "")">
+                            @if (attachmentType is { HasIcon: true })
+                            {
+                                <img src="/attachment-types/@attachmentType.Id/icon" alt="@attachmentType.Title" width="16" height="16"
+                                     title="@attachmentType.Title" class="me-2" />
+                            }
                             @(string.IsNullOrWhiteSpace(attachment.Title) ? "(untitled attachment)" : attachment.Title)
                             <a href="@attachment.FilePath" target="_blank" rel="noopener" class="ms-2">@attachment.FilePath</a>
                         </li>

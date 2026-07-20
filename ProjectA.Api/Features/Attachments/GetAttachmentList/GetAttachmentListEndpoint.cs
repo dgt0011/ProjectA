@@ -29,6 +29,7 @@ public static class GetAttachmentListEndpoint
                     entity.title,
                     entity.description,
                     entity.file_path,
+                    entity.attachment_type_id,
                     entity.date_created,
                     entity.date_modified))
                 .ToList();
@@ -48,6 +49,7 @@ public static class GetAttachmentListEndpoint
         string? Title,
         string? Description,
         string FilePath,
+        long? AttachmentTypeId,
         DateTime DateCreated,
         DateTime? DateModified);
 }

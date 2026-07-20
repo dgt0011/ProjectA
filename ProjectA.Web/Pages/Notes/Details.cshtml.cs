@@ -14,6 +14,7 @@ public class DetailsModel(
     IBookmarksApiClient bookmarksApiClient,
     IAttachmentsApiClient attachmentsApiClient,
     IBookmarkTypesApiClient bookmarkTypesApiClient,
+    IAttachmentTypesApiClient attachmentTypesApiClient,
     ICategoriesApiClient categoriesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
@@ -35,6 +36,12 @@ public class DetailsModel(
     // icon/row-color treatment stays identical wherever a bookmark is listed.
     public BookmarkTypeDto? BookmarkType(long? bookmarkTypeId) =>
         bookmarkTypeId is long id ? _bookmarkTypesById.GetValueOrDefault(id) : null;
+
+    private Dictionary<long, AttachmentTypeDto> _attachmentTypesById = [];
+
+    // Same null/missing-type semantics as BookmarkType(...) above, mirrored for Attachments.
+    public AttachmentTypeDto? AttachmentType(long? attachmentTypeId) =>
+        attachmentTypeId is long id ? _attachmentTypesById.GetValueOrDefault(id) : null;
 
     // Built once from the full notes list so the recursive _NoteTreeItem partial can look up
     // any note's direct children without re-fetching. Only Note's own descendants ever get
@@ -87,13 +94,23 @@ public class DetailsModel(
 
         if (Note.AttachmentIds.Count > 0)
         {
-            var attachmentsResult = await attachmentsApiClient.GetListAsync(cancellationToken);
+            var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
+            var attachmentTypesTask = attachmentTypesApiClient.GetListAsync(cancellationToken);
+            await Task.WhenAll(attachmentsTask, attachmentTypesTask);
+
+            var attachmentsResult = await attachmentsTask;
             if (attachmentsResult.IsSuccess)
             {
                 var attachmentIds = Note.AttachmentIds.ToHashSet();
                 AssociatedAttachments = (attachmentsResult.Value ?? [])
                     .Where(attachment => attachmentIds.Contains(attachment.Id))
                     .ToList();
+            }
+
+            var attachmentTypesResult = await attachmentTypesTask;
+            if (attachmentTypesResult.IsSuccess)
+            {
+                _attachmentTypesById = (attachmentTypesResult.Value ?? []).ToDictionary(attachmentType => attachmentType.Id);
             }
         }
         

@@ -1,5 +1,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Npgsql;
 using ProjectA.Api.Data;
 
 namespace ProjectA.Api.Features.Attachments.UpdateAttachment;
@@ -11,7 +12,7 @@ public static class UpdateAttachmentEndpoint
         group.MapPut("{id}", Handle)
             .WithName("UpdateAttachment")
             .WithSummary("Update an attachment")
-            .WithDescription("Replaces an existing attachment's title, description and file reference.")
+            .WithDescription("Replaces an existing attachment's title, description, file reference and attachment type.")
             .RequireAuthorization();
     }
 
@@ -44,9 +45,22 @@ public static class UpdateAttachmentEndpoint
         entity.title = request.Title;
         entity.description = request.Description;
         entity.file_path = request.FilePath;
+        entity.attachment_type_id = request.AttachmentTypeId;
         entity.date_modified = DateTime.UtcNow;
 
-        var updated = await connection.UpdateAsync(entity);
+        bool updated;
+        try
+        {
+            updated = await connection.UpdateAsync(entity);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.AttachmentTypeId)] = ["AttachmentTypeId does not refer to an existing attachment type."]
+            });
+        }
+
         if (!updated)
         {
             return notFound;
@@ -57,6 +71,7 @@ public static class UpdateAttachmentEndpoint
             entity.title,
             entity.description,
             entity.file_path,
+            entity.attachment_type_id,
             entity.date_created,
             entity.date_modified);
 
@@ -75,8 +90,10 @@ public static class UpdateAttachmentEndpoint
         return errors;
     }
 
-    // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateAttachmentRequest(string? Title, string? Description, string FilePath);
+    // Request body accepted by this endpoint - owned by this slice, not shared. AttachmentTypeId
+    // is a plain scalar (not a collection), so it follows the "always overwrite" convention -
+    // the Web form's dropdown always reflects the current selection (including "no type").
+    public sealed record UpdateAttachmentRequest(string? Title, string? Description, string FilePath, long? AttachmentTypeId);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record AttachmentResponse(
@@ -84,6 +101,7 @@ public static class UpdateAttachmentEndpoint
         string? Title,
         string? Description,
         string FilePath,
+        long? AttachmentTypeId,
         DateTime DateCreated,
         DateTime? DateModified);
 }

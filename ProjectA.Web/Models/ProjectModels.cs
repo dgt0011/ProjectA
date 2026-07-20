@@ -65,4 +65,7 @@ public sealed class ProjectNoteItemViewModel
     public required List<AttachmentDto> AssociatedAttachments { get; init; }
 
     public required IReadOnlyDictionary<long, BookmarkTypeDto> BookmarkTypesById { get; init; }
+
+    // Same shared-lookup reasoning as BookmarkTypesById, mirrored for Attachments.
+    public required IReadOnlyDictionary<long, AttachmentTypeDto> AttachmentTypesById { get; init; }
 }

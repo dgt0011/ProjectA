@@ -5,14 +5,25 @@ using ProjectA.Web.Services;
 
 namespace ProjectA.Web.Pages.Attachments;
 
-public class IndexModel(IAttachmentsApiClient attachmentsApiClient) : PageModel
+public class IndexModel(IAttachmentsApiClient attachmentsApiClient, IAttachmentTypesApiClient attachmentTypesApiClient) : PageModel
 {
     public List<AttachmentDto> Attachments { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
 
+    private Dictionary<long, AttachmentTypeDto> _attachmentTypesById = [];
+
+    // Null when the attachment has no AttachmentTypeId, or the type it referred to no longer
+    // exists - callers treat both cases the same way (no icon, no row color).
+    public AttachmentTypeDto? AttachmentType(long? attachmentTypeId) =>
+        attachmentTypeId is long id ? _attachmentTypesById.GetValueOrDefault(id) : null;
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var result = await attachmentsApiClient.GetListAsync(cancellationToken);
+        var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
+        var attachmentTypesTask = attachmentTypesApiClient.GetListAsync(cancellationToken);
+        await Task.WhenAll(attachmentsTask, attachmentTypesTask);
+
+        var result = await attachmentsTask;
         if (result.IsSuccess)
         {
             Attachments = result.Value ?? [];
@@ -20,6 +31,12 @@ public class IndexModel(IAttachmentsApiClient attachmentsApiClient) : PageModel
         else
         {
             LoadedSuccessfully = false;
+        }
+
+        var attachmentTypesResult = await attachmentTypesTask;
+        if (attachmentTypesResult.IsSuccess)
+        {
+            _attachmentTypesById = (attachmentTypesResult.Value ?? []).ToDictionary(attachmentType => attachmentType.Id);
         }
     }
 

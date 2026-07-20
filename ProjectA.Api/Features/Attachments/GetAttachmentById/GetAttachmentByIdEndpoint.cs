@@ -31,6 +31,7 @@ public static class GetAttachmentByIdEndpoint
                     entity.title,
                     entity.description,
                     entity.file_path,
+                    entity.attachment_type_id,
                     entity.date_created,
                     entity.date_modified);
 
@@ -55,6 +56,7 @@ public static class GetAttachmentByIdEndpoint
         string? Title,
         string? Description,
         string FilePath,
+        long? AttachmentTypeId,
         DateTime DateCreated,
         DateTime? DateModified);
 }

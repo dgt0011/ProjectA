@@ -8,7 +8,10 @@ using ProjectA.Web.Services;
 namespace ProjectA.Web.Pages.Attachments;
 
 [Authorize]
-public class CreateModel(IAttachmentsApiClient attachmentsApiClient, IWebHostEnvironment webHostEnvironment) : PageModel
+public class CreateModel(
+    IAttachmentsApiClient attachmentsApiClient,
+    IAttachmentTypesApiClient attachmentTypesApiClient,
+    IWebHostEnvironment webHostEnvironment) : PageModel
 {
     [BindProperty]
     public AttachmentInput Form { get; set; } = new();
@@ -19,8 +22,11 @@ public class CreateModel(IAttachmentsApiClient attachmentsApiClient, IWebHostEnv
     [BindProperty]
     public IFormFile? UploadedFile { get; set; }
 
-    public void OnGet()
+    public List<AttachmentTypeDto> AvailableAttachmentTypes { get; set; } = [];
+
+    public async Task OnGetAsync(CancellationToken cancellationToken)
     {
+        await LoadAttachmentTypesAsync(cancellationToken);
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
@@ -37,6 +43,7 @@ public class CreateModel(IAttachmentsApiClient attachmentsApiClient, IWebHostEnv
 
         if (!ModelState.IsValid)
         {
+            await LoadAttachmentTypesAsync(cancellationToken);
             return Page();
         }
 
@@ -54,10 +61,20 @@ public class CreateModel(IAttachmentsApiClient attachmentsApiClient, IWebHostEnv
                 ModelState.AddModelError(string.Empty, result.ToDisplayMessage("Could not create the attachment."));
             }
 
+            await LoadAttachmentTypesAsync(cancellationToken);
             return Page();
         }
 
         TempData["SuccessMessage"] = "Attachment created.";
         return RedirectToPage("Index");
+    }
+
+    private async Task LoadAttachmentTypesAsync(CancellationToken cancellationToken)
+    {
+        var result = await attachmentTypesApiClient.GetListAsync(cancellationToken);
+        if (result.IsSuccess)
+        {
+            AvailableAttachmentTypes = result.Value ?? [];
+        }
     }
 }

@@ -1,0 +1,45 @@
+@page "{id:long}"
+@model ProjectA.Web.Pages.AttachmentTypes.EditModel
+@{
+    ViewData["Title"] = "Edit attachment type";
+}
+
+<h1>Edit attachment type</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" enctype="multipart/form-data" class="col-md-6">
+    <div class="mb-3">
+        <label asp-for="Form.Title" class="form-label"></label>
+        <input asp-for="Form.Title" class="form-control" />
+        <span asp-validation-for="Form.Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Color" class="form-label"></label>
+        <div class="d-flex align-items-center gap-2">
+            <input type="color" class="form-control form-control-color" style="width: 3rem;"
+                   value="@(Model.Form.Color ?? "#6c757d")"
+                   oninput="document.getElementById('Form_Color').value = this.value;" />
+            <input asp-for="Form.Color" class="form-control" placeholder="#1A2B3C" style="max-width: 160px;" />
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('Form_Color').value = '';">Clear</button>
+        </div>
+        <span asp-validation-for="Form.Color" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        @if (Model.HasIcon)
+        {
+            <label class="form-label d-block">Current icon</label>
+            <img src="/attachment-types/@Model.Id/icon" alt="" width="16" height="16" class="mb-2" />
+            <div class="form-check mb-2">
+                <input asp-for="Form.RemoveIcon" class="form-check-input" />
+                <label asp-for="Form.RemoveIcon" class="form-check-label"></label>
+            </div>
+        }
+        <label asp-for="IconFile" class="form-label">@(Model.HasIcon ? "Replace icon" : "Icon")</label>
+        <input asp-for="IconFile" class="form-control" accept="image/png,image/gif,image/jpeg,image/webp,image/x-icon" />
+        <div class="form-text">Optional - a small icon (e.g. 16x16 PNG or GIF) shown next to this type's attachments.</div>
+        <span asp-validation-for="Form.IconBase64" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-page="Index" class="btn btn-link">Cancel</a>
+</form>

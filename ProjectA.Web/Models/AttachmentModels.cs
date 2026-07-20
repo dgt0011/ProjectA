@@ -12,6 +12,7 @@ public sealed class AttachmentDto
     // locally by ProjectA.Web (see AttachmentFileStorage), not in AWS S3 despite the historical
     // "S3Arn" name this replaced everywhere else in the stack.
     public string FilePath { get; set; } = string.Empty;
+    public long? AttachmentTypeId { get; set; }
     public DateTime DateCreated { get; set; }
     public DateTime? DateModified { get; set; }
 }
@@ -31,4 +32,7 @@ public sealed class AttachmentInput
     [Required(ErrorMessage = "File path is required.")]
     [Display(Name = "File path")]
     public string FilePath { get; set; } = string.Empty;
+
+    [Display(Name = "Attachment Type")]
+    public long? AttachmentTypeId { get; set; }
 }

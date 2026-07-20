@@ -24,6 +24,24 @@
         <input asp-for="UploadedFile" class="form-control" />
         <span asp-validation-for="UploadedFile" class="text-danger"></span>
     </div>
+    <div class="mb-3">
+        <label asp-for="Form.AttachmentTypeId" class="form-label"></label>
+        @if (Model.AvailableAttachmentTypes.Count == 0)
+        {
+            <p class="text-muted">No attachment types exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.AttachmentTypeId" class="form-select">
+                <option value="">(none)</option>
+                @foreach (var attachmentType in Model.AvailableAttachmentTypes)
+                {
+                    <option value="@attachmentType.Id">@attachmentType.Title</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.AttachmentTypeId" class="text-danger"></span>
+    </div>
     <button type="submit" class="btn btn-primary">Create</button>
     <a asp-page="Index" class="btn btn-link">Cancel</a>
 </form>

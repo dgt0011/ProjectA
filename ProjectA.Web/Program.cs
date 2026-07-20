@@ -70,6 +70,10 @@ builder.Services.AddHttpClient<IAttachmentsApiClient, AttachmentsApiClient>(clie
 {
     client.BaseAddress = new Uri(apiBaseUrl);
 }).AddHttpMessageHandler<BearerTokenHandler>();
+builder.Services.AddHttpClient<IAttachmentTypesApiClient, AttachmentTypesApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+}).AddHttpMessageHandler<BearerTokenHandler>();
 builder.Services.AddHttpClient<IToDoApiClient, ToDoApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
@@ -110,6 +114,14 @@ app.MapRazorPages();
 // BearerTokenHandler), so bookmark type icons need a small proxy route here rather than
 // pointing <img src> straight at the API.
 app.MapGet("/bookmark-types/{id:long}/icon", async (long id, IBookmarkTypesApiClient client, CancellationToken cancellationToken) =>
+{
+    var icon = await client.GetIconAsync(id, cancellationToken);
+    return icon is null ? Results.NotFound() : Results.File(icon.Bytes, icon.ContentType);
+});
+
+// Same reasoning as the bookmark-types icon proxy above - the browser can't call
+// ProjectA.Api directly, so attachment type icons need their own small proxy route here too.
+app.MapGet("/attachment-types/{id:long}/icon", async (long id, IAttachmentTypesApiClient client, CancellationToken cancellationToken) =>
 {
     var icon = await client.GetIconAsync(id, cancellationToken);
     return icon is null ? Results.NotFound() : Results.File(icon.Bytes, icon.ContentType);

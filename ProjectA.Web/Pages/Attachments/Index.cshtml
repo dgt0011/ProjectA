@@ -25,6 +25,7 @@ else
     <table class="table table-striped align-middle">
         <thead>
             <tr>
+                <th></th>
                 <th>Title</th>
                 <th>Description</th>
                 <th>File</th>
@@ -38,7 +39,14 @@ else
         <tbody>
             @foreach (var attachment in Model.Attachments)
             {
-                <tr>
+                var attachmentType = Model.AttachmentType(attachment.AttachmentTypeId);
+                <tr style="@(!string.IsNullOrWhiteSpace(attachmentType?.Color) ? $"background-color: {attachmentType.Color};" : "")">
+                    <td>
+                        @if (attachmentType is { HasIcon: true })
+                        {
+                            <img src="/attachment-types/@attachmentType.Id/icon" alt="@attachmentType.Title" width="16" height="16" title="@attachmentType.Title" />
+                        }
+                    </td>
                     <td>@attachment.Title</td>
                     <td>@attachment.Description</td>
                     <td class="text-break"><a href="@attachment.FilePath" target="_blank" rel="noopener">@attachment.FilePath</a></td>
