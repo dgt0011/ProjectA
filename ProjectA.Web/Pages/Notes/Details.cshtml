@@ -83,7 +83,7 @@ else
                             </div>
                             @if (!string.IsNullOrWhiteSpace(bookmark.Description))
                             {
-                                <div class="text-muted small mt-1">@bookmark.Description</div>
+                                <div class="text-muted small mt-1 @(bookmarkType is { HasIcon: true } ? "ms-4" : "")">@bookmark.Description</div>
                             }
                         </li>
                     }
@@ -113,7 +113,7 @@ else
                             </div>
                             @if (!string.IsNullOrWhiteSpace(attachment.Description))
                             {
-                                <div class="text-muted small mt-1">@attachment.Description</div>
+                                <div class="text-muted small mt-1 @(attachmentType is { HasIcon: true } ? "ms-4" : "")">@attachment.Description</div>
                             }
                         </li>
                     }
