@@ -1,0 +1,31 @@
+---
+
+- name: Update all installed packages
+  package:
+    name: '*'
+    state: latest
+    update_cache: yes
+
+- name: "Install unattended-upgrades"
+  package:
+    name:
+      - unattended-upgrades
+    state: latest
+
+- name: "Enable automatic reboot if required"
+  lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: '^[/\s]*Unattended-Upgrade::Automatic-Reboot\s'
+    line: 'Unattended-Upgrade::Automatic-Reboot "true";'
+
+- name: "Reboot even if users are logged in with Automatic-Reboot set to true"
+  lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: '^[/\s]*Unattended-Upgrade::Automatic-Reboot-WithUsers\s'
+    line: 'Unattended-Upgrade::Automatic-Reboot-WithUsers "true";'
+
+- name: "Reboot at a set time rather than immediately (server unlikely to be in use at the time)"
+  lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: '^[/\s]*Unattended-Upgrade::Automatic-Reboot-Time\s'
+    line: 'Unattended-Upgrade::Automatic-Reboot-Time "02:00";'
