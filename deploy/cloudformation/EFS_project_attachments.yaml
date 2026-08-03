@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation Template to create an Elastic File System (EFS) for the Projects website attachments
+Parameters:
+# VPC Specific Configurations
+  VpcId:
+    Description: Identifier of the VPC to use.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Id-APSouthEast-2'
+  VpcIpv4CIDR:
+    Description: The IPv4 CIDR for the VPC.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Cidr-APSouthEast-2'
+  PrivateSubnet1:
+    Description: The IPv4 CIDR for the VPC.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Private-Subnet-1-APSouthEast-2'
+  PrivateSubnet2:
+    Description: The IPv4 CIDR for the VPC.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Private-Subnet-2-APSouthEast-2'
+  PrivateSubnet3:
+    Description: The IPv4 CIDR for the VPC.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Private-Subnet-3-APSouthEast-2'
+
+  EFSFileSystemName:
+    Default: efs-projects
+    Description: Choose a name for the EFS file system
+    Type: String
+  EFSBackupPolicy:
+    Default: ENABLED
+    Description: Choose the backup policy for the EFS file system
+    Type: String
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    ConstraintDescription: Must be either ENABLED or DISABLED
+  EFSEncrypted:
+    Default: true
+    Description: Choose whether the EFS file system should be encrypted
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    ConstraintDescription: Must be either true or false
+  EFSPerformanceMode:
+    Default: generalPurpose
+    Description: Choose the performance mode for the EFS file system
+    Type: String
+    AllowedValues:
+      - generalPurpose
+      - maxIO
+    ConstraintDescription: Must be either generalPurpose or maxIO
+  EFSThroughputMode:
+    Default: bursting
+    Description: Choose the throughput mode for the EFS file system
+    Type: String
+    AllowedValues:
+      - bursting
+      - provisioned
+      - elastic
+    ConstraintDescription: Must be either bursting, elastic or provisioned
+  EFSProvisionedThroughput:
+    Default: 0
+    Description: Choose the provisioned throughput for the EFS file system
+    Type: Number
+    MinValue: 0
+    MaxValue: 1024
+    ConstraintDescription: Must be between 0 and 1024
+
+  #Tag Parameters
+  ProjectTag:
+    Description: The Project tag to assign to all AWS resources
+    Type: String
+    MinLength: 2
+    MaxLength: 255
+    Default: projects
+  ApplicationTag:
+    Description: The Application tag to assign to all AWS resources
+    Type: String
+    MinLength: 3
+    MaxLength: 255
+    Default: storage
+  ResourceTypeTag:
+    Description: The Resource Type tag to assign to all AWS resources
+    Type: String
+    MinLength: 3
+    MaxLength: 255
+    Default: storage
+
+Conditions:
+  IsProvisionedThroughputSet: !Equals [!Ref EFSProvisionedThroughput, provisioned]
+
+Resources:
+
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EFS mount targets
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 2049
+        ToPort: 2049
+        CidrIp: !Ref VpcIpv4CIDR
+
+  EFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      BackupPolicy:
+        Status: !Ref EFSBackupPolicy
+      Encrypted: !Ref EFSEncrypted
+      FileSystemTags:
+        - Key: Name
+          Value: !Ref EFSFileSystemName
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
+        - Key: ResourceType
+          Value: !Ref ResourceTypeTag
+      PerformanceMode: !Ref EFSPerformanceMode
+      ThroughputMode: !Ref EFSThroughputMode
+      ProvisionedThroughputInMibps: !If [ IsProvisionedThroughputSet, !Ref EFSProvisionedThroughput, '' ]
+
+  EFSMountTargetSubnetPrivateA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroups:
+      - !Ref EFSSecurityGroup
+
+  EFSMountTargetSubnetPrivateB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroups:
+      - !Ref EFSSecurityGroup
+
+  EFSMountTargetSubnetPrivateC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: !Ref PrivateSubnet3
+      SecurityGroups:
+      - !Ref EFSSecurityGroup
+
+  AccessPoint1:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref EFS
+      PosixUser:
+        Uid: '1000'
+        Gid: '1000'
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: '1000'
+          OwnerUid: '1000'
+          Permissions: '755'
+        Path: '/data'
+      AccessPointTags:
+        - Key: Name
+          Value: !Sub '${EFSFileSystemName}-data'
+
+Outputs:
+  EFSId:
+    Description: The ID of the EFS file system
+    Value: !Ref EFS
+    Export:
+      Name: !Sub '${EFSFileSystemName}-efs-id'
+  EFSMountTargetSubnetPrivateA:
+    Description: The ID of the EFS mount target in subnet A
+    Value: !Ref EFSMountTargetSubnetPrivateA
+    Export:
+      Name: !Sub '${EFSFileSystemName}-efs-mount-target-subnet-private-a'
+  EFSMountTargetSubnetPrivateB:
+    Description: The ID of the EFS mount target in subnet B
+    Value: !Ref EFSMountTargetSubnetPrivateB
+    Export:
+      Name: !Sub '${EFSFileSystemName}-efs-mount-target-subnet-private-b'
+  EFSMountTargetSubnetPrivateC:
+    Description: The ID of the EFS mount target in subnet C
+    Value: !Ref EFSMountTargetSubnetPrivateC
+    Export:
+      Name: !Sub '${EFSFileSystemName}-efs-mount-target-subnet-private-c'
+  EFSAccessPoint1:
+    Description: The ID of the EFS access point
+    Value: !Ref AccessPoint1
+    Export:
+      Name: !Sub '${EFSFileSystemName}-efs-access-point-1'
