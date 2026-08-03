@@ -28,7 +28,8 @@ public static class GetAttachmentListEndpoint
                     entity.id,
                     entity.title,
                     entity.description,
-                    entity.s3_arn,
+                    entity.file_path,
+                    entity.attachment_type_id,
                     entity.date_created,
                     entity.date_modified))
                 .ToList();
@@ -47,7 +48,8 @@ public static class GetAttachmentListEndpoint
         long Id,
         string? Title,
         string? Description,
-        string S3Arn,
+        string FilePath,
+        long? AttachmentTypeId,
         DateTime DateCreated,
         DateTime? DateModified);
 }

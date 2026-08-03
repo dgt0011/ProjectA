@@ -109,9 +109,6 @@ public static class CreateNoteEndpoint
             });
         }
         
-        //TODO: Is this required here?
-        transaction.Commit();
-
         var response = new NoteResponse(
             entity.id,
             entity.title,

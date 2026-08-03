@@ -14,7 +14,8 @@ public class DetailsModel(
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
     IAttachmentsApiClient attachmentsApiClient,
-    IBookmarkTypesApiClient bookmarkTypesApiClient) : PageModel
+    IBookmarkTypesApiClient bookmarkTypesApiClient,
+    IAttachmentTypesApiClient attachmentTypesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -26,6 +27,16 @@ public class DetailsModel(
     // own Details page resolves BookmarkIds/AttachmentIds to summaries.
     public List<BookmarkDto> AssociatedBookmarks { get; set; } = [];
     public List<AttachmentDto> AssociatedAttachments { get; set; } = [];
+
+    private Dictionary<long, AttachmentTypeDto> _attachmentTypesById = [];
+
+    // Null when the attachment has no AttachmentTypeId, or the type it referred to no longer
+    // exists - same helper/semantics as Attachments' own Index page (AttachmentType(...)) so
+    // the icon/row-color treatment stays identical wherever an attachment is listed. Used for
+    // the Project's own AssociatedAttachments here; _ProjectNoteItem uses the shared
+    // AttachmentTypesById lookup handed down via ProjectNoteItemViewModel instead.
+    public AttachmentTypeDto? AttachmentType(long? attachmentTypeId) =>
+        attachmentTypeId is long id ? _attachmentTypesById.GetValueOrDefault(id) : null;
 
     // Each associated Note rendered in full (title, description, body, its own bookmarks/
     // attachments) inside a collapsible container, ordered oldest-first (by DateCreated
@@ -88,10 +99,20 @@ public class DetailsModel(
         var attachmentsById = new Dictionary<long, AttachmentDto>();
         if (needsAttachments)
         {
-            var attachmentsResult = await attachmentsApiClient.GetListAsync(cancellationToken);
+            var attachmentsTask = attachmentsApiClient.GetListAsync(cancellationToken);
+            var attachmentTypesTask = attachmentTypesApiClient.GetListAsync(cancellationToken);
+            await Task.WhenAll(attachmentsTask, attachmentTypesTask);
+
+            var attachmentsResult = await attachmentsTask;
             if (attachmentsResult.IsSuccess)
             {
                 attachmentsById = (attachmentsResult.Value ?? []).ToDictionary(attachment => attachment.Id);
+            }
+
+            var attachmentTypesResult = await attachmentTypesTask;
+            if (attachmentTypesResult.IsSuccess)
+            {
+                _attachmentTypesById = (attachmentTypesResult.Value ?? []).ToDictionary(attachmentType => attachmentType.Id);
             }
         }
 
@@ -104,7 +125,8 @@ public class DetailsModel(
                 Note = note,
                 AssociatedBookmarks = [.. note.BookmarkIds.Select(bookmarksById.GetValueOrDefault).OfType<BookmarkDto>()],
                 AssociatedAttachments = [.. note.AttachmentIds.Select(attachmentsById.GetValueOrDefault).OfType<AttachmentDto>()],
-                BookmarkTypesById = bookmarkTypesById
+                BookmarkTypesById = bookmarkTypesById,
+                AttachmentTypesById = _attachmentTypesById
             })
             .ToList();
 

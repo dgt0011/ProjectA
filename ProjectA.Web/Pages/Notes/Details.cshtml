@@ -69,16 +69,22 @@ else
                     @foreach (var bookmark in Model.AssociatedBookmarks)
                     {
                         var bookmarkType = Model.BookmarkType(bookmark.BookmarkTypeId);
-                        <li class="list-group-item d-flex align-items-center"
+                        <li class="list-group-item"
                             style="@(!string.IsNullOrWhiteSpace(bookmarkType?.Color) ? $"background-color: {bookmarkType.Color};" : "")">
-                            @if (bookmarkType is { HasIcon: true })
+                            <div class="d-flex align-items-center">
+                                @if (bookmarkType is { HasIcon: true })
+                                {
+                                    <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16"
+                                         title="@bookmarkType.Title" class="me-2" />
+                                }
+                                <a href="@bookmark.Url" target="_blank" rel="noopener">
+                                    @(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)
+                                </a>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(bookmark.Description))
                             {
-                                <img src="/bookmark-types/@bookmarkType.Id/icon" alt="@bookmarkType.Title" width="16" height="16"
-                                     title="@bookmarkType.Title" class="me-2" />
+                                <div class="text-muted small mt-1 @(bookmarkType is { HasIcon: true } ? "ms-4" : "")">@bookmark.Description</div>
                             }
-                            <a href="@bookmark.Url" target="_blank" rel="noopener">
-                                @(string.IsNullOrWhiteSpace(bookmark.Title) ? bookmark.Url : bookmark.Title)
-                            </a>
                         </li>
                     }
                 </ul>
@@ -92,9 +98,23 @@ else
                 <ul class="list-group">
                     @foreach (var attachment in Model.AssociatedAttachments)
                     {
-                        <li class="list-group-item">
-                            @(string.IsNullOrWhiteSpace(attachment.Title) ? "(untitled attachment)" : attachment.Title)
-                            <code class="text-muted ms-2">@attachment.S3Arn</code>
+                        var attachmentType = Model.AttachmentType(attachment.AttachmentTypeId);
+                        <li class="list-group-item"
+                            style="@(!string.IsNullOrWhiteSpace(attachmentType?.Color) ? $"background-color: {attachmentType.Color};" : "")">
+                            <div class="d-flex align-items-center">
+                                @if (attachmentType is { HasIcon: true })
+                                {
+                                    <img src="/attachment-types/@attachmentType.Id/icon" alt="@attachmentType.Title" width="16" height="16"
+                                         title="@attachmentType.Title" class="me-2" />
+                                }
+                                <a href="@attachment.FilePath" target="_blank" rel="noopener">
+                                    @(string.IsNullOrWhiteSpace(attachment.Title) ? attachment.FilePath : attachment.Title)
+                                </a>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(attachment.Description))
+                            {
+                                <div class="text-muted small mt-1 @(attachmentType is { HasIcon: true } ? "ms-4" : "")">@attachment.Description</div>
+                            }
                         </li>
                     }
                 </ul>

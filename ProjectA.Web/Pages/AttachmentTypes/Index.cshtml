@@ -1,0 +1,69 @@
+@page
+@model ProjectA.Web.Pages.AttachmentTypes.IndexModel
+@{
+    ViewData["Title"] = "Attachment Types";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Attachment Types</h1>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-page="Create" class="btn btn-primary">Create attachment type</a>
+    }
+</div>
+
+@if (!Model.LoadedSuccessfully)
+{
+    <div class="alert alert-warning">Could not load attachment types from the API.</div>
+}
+else if (Model.AttachmentTypes.Count == 0)
+{
+    <p class="text-muted">No attachment types yet.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Icon</th>
+                <th>Title</th>
+                <th>Color</th>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <th class="text-end">Actions</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var attachmentType in Model.AttachmentTypes)
+            {
+                <tr>
+                    <td>
+                        @if (attachmentType.HasIcon)
+                        {
+                            <img src="/attachment-types/@attachmentType.Id/icon" alt="" width="16" height="16" />
+                        }
+                    </td>
+                    <td>@attachmentType.Title</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(attachmentType.Color))
+                        {
+                            <span class="d-inline-block rounded border" style="width: 1rem; height: 1rem; background-color: @attachmentType.Color; vertical-align: text-bottom;"></span>
+                            <span class="ms-1">@attachmentType.Color</span>
+                        }
+                    </td>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <td class="text-end">
+                            <a asp-page="Edit" asp-route-id="@attachmentType.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@attachmentType.Id" class="d-inline"
+                                  onsubmit="return confirm('Delete this attachment type?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}

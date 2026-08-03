@@ -8,7 +8,7 @@
 
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-<form method="post" class="col-md-6">
+<form method="post" enctype="multipart/form-data" class="col-md-6">
     <div class="mb-3">
         <label asp-for="Form.Title" class="form-label"></label>
         <input asp-for="Form.Title" class="form-control" />
@@ -20,9 +20,27 @@
         <span asp-validation-for="Form.Description" class="text-danger"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="Form.S3Arn" class="form-label"></label>
-        <input asp-for="Form.S3Arn" class="form-control" placeholder="arn:aws:s3:::bucket/key" />
-        <span asp-validation-for="Form.S3Arn" class="text-danger"></span>
+        <label asp-for="UploadedFile" class="form-label">File</label>
+        <input asp-for="UploadedFile" class="form-control" />
+        <span asp-validation-for="UploadedFile" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.AttachmentTypeId" class="form-label"></label>
+        @if (Model.AvailableAttachmentTypes.Count == 0)
+        {
+            <p class="text-muted">No attachment types exist yet.</p>
+        }
+        else
+        {
+            <select asp-for="Form.AttachmentTypeId" class="form-select">
+                <option value="">(none)</option>
+                @foreach (var attachmentType in Model.AvailableAttachmentTypes)
+                {
+                    <option value="@attachmentType.Id">@attachmentType.Title</option>
+                }
+            </select>
+        }
+        <span asp-validation-for="Form.AttachmentTypeId" class="text-danger"></span>
     </div>
     <button type="submit" class="btn btn-primary">Create</button>
     <a asp-page="Index" class="btn btn-link">Cancel</a>
