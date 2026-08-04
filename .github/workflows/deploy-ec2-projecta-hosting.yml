@@ -8,12 +8,12 @@ on:
     branches: [main]
     paths:
       - deploy/cloudformation/EC2_projecta_hosting.yaml
-      - .github/workflows/deploy-ec2-projecta_hosting.yml
+      - .github/workflows/deploy-ec2-projecta-hosting.yml
   pull_request:
     branches: [main]
     paths:
-      - deploy/cloudformation/parameters.yaml
-      - .github/workflows/deploy-ec2-projecta_hosting.yml
+      - deploy/cloudformation/EC2_projecta_hosting.yaml
+      - .github/workflows/deploy-ec2-projecta-hosting.yml
   workflow_dispatch:
     inputs:
       stack_name:
@@ -101,7 +101,8 @@ jobs:
             --template-body "file://${TEMPLATE_FILE}" \
             --role-arn "${{ vars.AWS_CFN_EXECUTION_ROLE_ARN }}" \
             --change-set-name "$CHANGE_SET_NAME" \
-            --change-set-type "$CHANGE_SET_TYPE"
+            --change-set-type "$CHANGE_SET_TYPE" \
+            --capabilities CAPABILITY_NAMED_IAM
 
           # Change set creation is asynchronous - wait for it to finish computing.
           # Deliberately not failing the job here: "no changes to preview" is a normal,
@@ -182,7 +183,9 @@ jobs:
             --template-file "$TEMPLATE_FILE" \
             --role-arn "${{ vars.AWS_CFN_EXECUTION_ROLE_ARN }}" \
             --no-fail-on-empty-changeset \
-            --tags Project=projecta Application=shared-parameters ManagedBy=github-actions
+            --tags Project=ProjectA Application=ProjectA ManagedBy=github-actions \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides ProjectTag=ProjectA ApplicationTag=ProjectA InstanceType=t3.micro
 
       - name: Show final stack status
         if: always()

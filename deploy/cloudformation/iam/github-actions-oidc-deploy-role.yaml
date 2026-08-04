@@ -152,10 +152,8 @@ Resources:
                   StringEquals:
                     iam:PassedToService: cloudformation.amazonaws.com
 
-  # Assumed only by the CloudFormation service (never by GitHub Actions directly) to
-  # actually create/update the SSM parameter resources declared in
-  # deploy/cloudformation/parameters.yaml. Passed to `aws cloudformation deploy`
-  # via --role-arn.
+  # Assumed only by the CloudFormation service (never by GitHub Actions directly)
+  #Passed to `aws cloudformation deploy` via --role-arn.
   CfnExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -185,6 +183,167 @@ Resources:
                   - ssm:ListTagsForResource
                 Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${SsmParameterPrefix}
+
+        # --- IAM: the instance role itself ---
+        - PolicyName: iam-instance-role-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageInstanceRole
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:GetRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PutRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/*-instance-role
+              - Sid: AttachOnlyTheExpectedManagedPolicies
+                Effect: Allow
+                Action: iam:AttachRolePolicy
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/*-instance-role
+                Condition:
+                  ArnEquals:
+                    iam:PolicyARN:
+                      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+                      - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+
+        # --- IAM: the instance profile ---
+        - PolicyName: iam-instance-profile-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageInstanceProfile
+                Effect: Allow
+                Action:
+                  - iam:CreateInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:AddRoleToInstanceProfile
+                  - iam:TagInstanceProfile
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:instance-profile/*-instance-profile
+
+        # --- IAM: PassRole, so EC2 can attach the instance role via the profile at launch ---
+        - PolicyName: iam-passrole-to-ec2-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: PassInstanceRoleToEc2Only
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/*-instance-role
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ec2.amazonaws.com
+
+        # --- EC2: the three security groups ---
+        - PolicyName: ec2-security-groups-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageSecurityGroups
+                Effect: Allow
+                Action:
+                  - ec2:CreateSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:vpc/*
+              - Sid: TagSecurityGroupsOnCreate
+                Effect: Allow
+                Action: ec2:CreateTags
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+                Condition:
+                  StringEquals:
+                    ec2:CreateAction: CreateSecurityGroup
+              - Sid: DescribeSecurityGroupsIsUnscoped
+                Effect: Allow
+                # EC2 Describe* actions don't support resource-level permissions - must be '*'.
+                Action:
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeTags
+                Resource: '*'
+
+        # --- EC2: the instance itself (launch + in-place attribute updates only) ---
+        - PolicyName: ec2-instance-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: LaunchInstance
+                Effect: Allow
+                # RunInstances checks permissions against every sub-resource type it touches, not
+                # just the instance itself - each is scoped to this account/region where possible.
+                Action: ec2:RunInstances
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                  - !Sub arn:aws:ec2:${AWS::Region}::image/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:key-pair/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:volume/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*
+              - Sid: ModifyExistingInstanceAttributes
+                Effect: Allow
+                Action: ec2:ModifyInstanceAttribute
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+              - Sid: TagInstanceAndVolumesOnCreate
+                Effect: Allow
+                Action: ec2:CreateTags
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:volume/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*
+                Condition:
+                  StringEquals:
+                    ec2:CreateAction: RunInstances
+              - Sid: RequiredUnscopedReads
+                Effect: Allow
+                # None of these support resource-level permissions - must be '*'.
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceAttribute
+                  - ec2:DescribeImages
+                  - ec2:DescribeKeyPairs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeVolumes
+                Resource: '*'
+
+        # --- EC2: the Elastic IP ---
+        - PolicyName: ec2-elastic-ip-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AssociateAddressToInstance
+                Effect: Allow
+                Action: ec2:AssociateAddress
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:elastic-ip/*
+              - Sid: TagElasticIpOnCreate
+                Effect: Allow
+                Action: ec2:CreateTags
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:elastic-ip/*
+                Condition:
+                  StringEquals:
+                    ec2:CreateAction: AllocateAddress
+              - Sid: RequiredUnscopedAllocateAndDescribe
+                Effect: Allow
+                # AllocateAddress and DescribeAddresses don't support resource-level permissions.
+                Action:
+                  - ec2:AllocateAddress
+                  - ec2:DescribeAddresses
+                Resource: '*'
 
 Outputs:
   GitHubActionsDeployRoleArn:
