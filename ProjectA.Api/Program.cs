@@ -18,6 +18,13 @@ using ProjectA.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Must run before anything below reads ConnectionStrings:DefaultConnection or Jwt:SigningKey
+// (including the eager `connectionString = builder.Configuration.GetConnectionString(...)`
+// read a few lines down) - see the comment on AwsSecretsLoader itself for exactly why. This is
+// a no-op (no AWS call at all) unless AwsSecrets:Enabled is true, which it only is in
+// appsettings.Production.json.
+await AwsSecretsLoader.LoadIntoConfigurationAsync(builder.Configuration);
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
