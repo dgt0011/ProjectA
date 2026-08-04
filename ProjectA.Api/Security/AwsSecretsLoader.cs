@@ -3,7 +3,7 @@ using System.Text.Json;
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
-using Microsoft.Extensions.Configuration;
+
 using Npgsql;
 
 namespace ProjectA.Api.Security;
