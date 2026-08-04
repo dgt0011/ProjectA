@@ -1,0 +1,200 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  GitHub Actions OIDC federation for deploying deploy/cloudformation/parameters.yaml.
+  Creates (optionally) the GitHub OIDC identity provider, a role GitHub Actions
+  assumes via short-lived federated credentials (no long-lived AWS keys stored in
+  GitHub), and a separate, narrowly-scoped CloudFormation execution role that the
+  CloudFormation service itself assumes to actually create/update resources. This
+  two-role split means leaked GitHub Actions credentials can only call
+  CloudFormation APIs and pass exactly one specific role - never call ssm:* (or
+  any other service) directly.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organisation or username that owns the repository (case-sensitive).
+    AllowedPattern: '.+'
+
+  GitHubRepo:
+    Type: String
+    Description: Repository name only, without the org/ prefix (case-sensitive).
+    AllowedPattern: '.+'
+
+  CreateOidcProvider:
+    Type: String
+    Description: >
+      Set to false if a token.actions.githubusercontent.com OIDC provider already
+      exists in this AWS account (an account can only have one - creating a second
+      fails with an "already exists" error).
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
+  ExistingOidcProviderArn:
+    Type: String
+    Description: >
+      Only used when CreateOidcProvider is false. ARN of the existing
+      token.actions.githubusercontent.com provider, e.g.
+      arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com
+    Default: ''
+
+  GitHubPlanEnvironmentName:
+    Type: String
+    Description: >
+      Name of the GitHub Environment used by the read-only "plan" job (runs on
+      pull_request, creates/describes a change set, never executes it).
+    Default: aws-plan
+
+  GitHubDeployEnvironmentName:
+    Type: String
+    Description: >
+      Name of the protected GitHub Environment used by the "deploy" job (should have
+      required reviewers configured and be restricted to the main branch).
+    Default: aws-production
+
+  StackNamePattern:
+    Type: String
+    Description: >
+      Wildcard pattern (no leading '/') restricting which CloudFormation stacks the
+      deploy role may operate on. Keep this as narrow as possible.
+    Default: projecta-shared-parameters*
+
+  SsmParameterPrefix:
+    Type: String
+    Description: >
+      Wildcard prefix (no leading '/') restricting which SSM parameters the
+      CloudFormation execution role may write. Must cover every parameter Name
+      defined in deploy/cloudformation/parameters.yaml.
+    Default: Primary-*
+
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      # AWS validates the token against its own trusted CA store for this well-known
+      # issuer, but the property is required by the resource type; this is GitHub's
+      # documented root CA thumbprint.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  # Assumed directly by GitHub Actions via OIDC (sts:AssumeRoleWithWebIdentity).
+  # Deliberately holds NO permissions on SSM, S3, etc. - only enough CloudFormation
+  # access to drive a deploy of one specific stack, plus permission to pass (not
+  # assume) the execution role below to the CloudFormation service.
+  GitHubActionsDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub gha-${GitHubRepo}-cfn-deploy
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Ref ExistingOidcProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              # Both keys must live under a single StringEquals map - YAML does not
+              # support two sibling keys with the same name, so a second StringEquals:
+              # block here would silently replace the first rather than adding to it.
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # Restricting sub to specific GitHub Environments (rather than a branch
+                # ref) means only workflow runs that passed that Environment's own
+                # protection rules (e.g. required reviewers on aws-production) can ever
+                # obtain credentials - not just any push to main.
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubPlanEnvironmentName}
+                  - !Sub repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubDeployEnvironmentName}
+      Policies:
+        - PolicyName: cloudformation-deploy-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CloudFormationStackLifecycle
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ListChangeSets
+                  - cloudformation:TagResource
+                  - cloudformation:UntagResource
+                Resource:
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${StackNamePattern}/*
+              - Sid: CloudFormationValidateTemplateIsUnscoped
+                Effect: Allow
+                # ValidateTemplate has no resource-level permissions in IAM - it must be "*".
+                Action: cloudformation:ValidateTemplate
+                Resource: '*'
+              - Sid: PassExecutionRoleToCloudFormationOnly
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CfnExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+
+  # Assumed only by the CloudFormation service (never by GitHub Actions directly) to
+  # actually create/update the SSM parameter resources declared in
+  # deploy/cloudformation/parameters.yaml. Passed to `aws cloudformation deploy`
+  # via --role-arn.
+  CfnExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${GitHubRepo}-cfn-execution
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ssm-parameters-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageSharedSsmParameters
+                Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:DeleteParameter
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:ListTagsForResource
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${SsmParameterPrefix}
+
+Outputs:
+  GitHubActionsDeployRoleArn:
+    Description: >
+      Set this as the AWS_DEPLOY_ROLE_ARN repository/environment variable used by
+      .github/workflows/deploy-cloudformation-parameters.yml.
+    Value: !GetAtt GitHubActionsDeployRole.Arn
+
+  CfnExecutionRoleArn:
+    Description: >
+      Set this as the AWS_CFN_EXECUTION_ROLE_ARN repository/environment variable
+      used by .github/workflows/deploy-cloudformation-parameters.yml.
+    Value: !GetAtt CfnExecutionRole.Arn
