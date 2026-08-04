@@ -1,0 +1,7 @@
+---
+
+- name: Copy get_disk_info script
+  copy:
+    src: get_disk_info.sh
+    dest: /tmp/
+    mode: 775

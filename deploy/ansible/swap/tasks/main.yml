@@ -1,0 +1,27 @@
+---
+
+- name: Get file system on device
+  shell: /tmp/get_disk_info.sh swap fs
+  register: fs_result
+
+- name: Get device path
+  shell: /tmp/get_disk_info.sh swap path
+  register: path_result
+  when: fs_result.stdout != "swap"
+
+- name: Set up device as swap space
+  command: "mkswap {{ path_result.stdout }}"
+  when: fs_result.stdout != "swap"
+
+- name: Get device UUID
+  shell: /tmp/get_disk_info.sh swap uuid
+  register: uuid_result
+
+- name: Register swap device in fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "UUID={{ uuid_result.stdout }} swap swap defaults,nofail 0 0"
+    regexp: "\\bswap\\b"
+
+- name: Activate swap device
+  shell: swapon -s | grep /dev/ > /dev/null || swapon UUID={{ uuid_result.stdout }}

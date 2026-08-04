@@ -1,0 +1,6 @@
+---
+
+- name: set the timezone
+  timezone:
+    hwclock: UTC
+    name: Australia/Brisbane

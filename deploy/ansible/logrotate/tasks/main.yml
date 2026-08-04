@@ -1,0 +1,63 @@
+---
+
+- name: Update and upgrade apt packages
+  become: true
+  apt:
+    upgrade: yes
+    update_cache: yes
+    cache_valid_time: 86400 #One day
+    
+- name: Install and set up system packages
+  package:
+    name: logrotate
+    state: latest
+
+- name: Change default extension from index-based to date-based
+  lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^[# \t]*dateext'
+    line: dateext
+
+- name: Enable compression of log files
+  lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^[# \t]*compress'
+    line: compress
+
+- name: Do not delay compressing logs (set nodelaycompress option)
+  lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^[# \t]*nodelaycompress'
+    line: nodelaycompress
+
+- name: Prevent compression of log files from being disabled
+  lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^[ \t]*nocompress'
+    state: absent
+
+- name: Do not delay compressing logs (remove delaycompress option)
+  lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^[ \t]*delaycompress'
+    state: absent
+
+- name: Find logrotate configuration files
+  find:
+    paths: "/etc/logrotate.d"
+    recurse: yes
+  register: find_result
+
+- name: Prevent compression of log files from being disabled
+  lineinfile:
+    path: "{{ item.path }}"
+    regexp: '^[ \t]*nocompress'
+    state: absent
+  with_items: "{{ find_result.files }}"
+
+- name: Do not delay compressing logs (remove delaycompress option)
+  lineinfile:
+    path: "{{ item.path }}"
+    regexp: '^[ \t]*delaycompress'
+    state: absent
+  with_items: "{{ find_result.files }}"

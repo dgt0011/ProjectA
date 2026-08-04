@@ -1,0 +1,4 @@
+---
+
+dependencies:
+  - role: get_disk_info_script

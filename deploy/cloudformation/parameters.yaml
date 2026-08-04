@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Shared Parameters
+
+Resources:
+  apSouthEast2PrimaryVpcId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Id-APSouthEast-2'
+      Type: 'String'
+      Value: 'vpc-0cb9af24e2959c07c'
+
+  apSouthEast2PrimaryVpcCidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Cidr-APSouthEast-2'
+      Type: 'String'
+      Value: '192.168.0.0/20'
+
+  apSouthEast2PrimaryVpcPublicSubnet1:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Public-Subnet-1-APSouthEast-2'
+      Type: 'String'
+      Value: 'subnet-01504843259cfd97a'
+
+  apSouthEast2PrimaryVpcPublicSubnet2:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Public-Subnet-2-APSouthEast-2'
+      Type: 'String'
+      Value: 'subnet-067722dd54f69d13b'
+
+  apSouthEast2PrimaryVpcPublicSubnet3:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Public-Subnet-3-APSouthEast-2'
+      Type: 'String'
+      Value: 'subnet-01c9be9c478e8d400'
+
+
+  apSouthEast2PrimaryVpcPrivateSubnet1:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Private-Subnet-1-APSouthEast-2'
+      Type: 'String'
+      Value: 'subnet-0224bfb6a53a26cad'
+
+  apSouthEast2PrimaryVpcPrivateSubnet2:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Private-Subnet-2-APSouthEast-2'
+      Type: 'String'
+      Value: 'subnet-08da642815a96a8b0'
+
+  apSouthEast2PrimaryVpcPrivateSubnet3:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: 'Primary-Vpc-Private-Subnet-3-APSouthEast-2'
+      Type: 'String'
+      Value: 'subnet-0de86f3ddc4fc627f'

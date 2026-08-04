@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Server Stack for projects.darrentuer.net
+Parameters:
+
+  AlarmSNSTopicName:
+    Type: String
+    Description: The Name of the alert sns topic
+    Default: alerts
+
+# VPC Specific Configurations
+  VpcId:
+    Description: Identifier of the VPC to use.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Id-APSouthEast-2'
+  VpcIpv4CIDR:
+    Description: The IPv4 CIDR for the VPC.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Cidr-APSouthEast-2'
+  SubnetId:
+    Description: The subnet to deploy the server into.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'Primary-Vpc-Public-Subnet-1-APSouthEast-2'
+
+# DNS Specific Configurations
+# would go here.  However, the DNS name for this server are managed externally
+
+# Instance Specific Configurations
+  Name:
+    Description: Name of the instance
+    Type: String
+    MinLength: 3
+    MaxLength: 255
+    Default: projects-darrentuer-net
+  AMIId:
+    Description: AMI Id to create the EC2 instance from
+    Type: AWS::EC2::Image::Id
+    AllowedPattern: ami-[a-zA-Z0-9]{8,17}
+    ConstraintDescription: Must be a valid Image ID
+    Default: ami-00902d02d7a700776    # Debian 12 (HVM), EBS General Purpose (SSD) Volume Type. Community developed free GNU/Linux distribution.
+  InstanceType:
+    Default: t3.micro
+    Description: Type of the instance to launch
+    Type: String
+    AllowedValues:
+    - t3.nano
+    - t3.micro
+    - t3.small
+    - t3.medium
+  RootVolumeSize:
+    Type: Number
+    Description: Size in GB for the root Volume
+    Default: 8
+  SwapVolumeSize:
+    Type: Number
+    Description: Size in GB for the Swap Volume (200% of RAM)
+    Default: 4
+    AllowedValues:
+      - 1
+      - 2
+      - 4
+      - 8
+      - 16
+      - 32
+      - 64
+      - 128
+  TerminationProtection:
+    Type: String
+    Description: Enable or disable termination protection for the instance
+    Default: true
+    AllowedValues:
+      - true
+      - false
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable ssh access to the instance.
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+    Default: projects-keypair
+
+# Application Details
+ 
+#Tag Parameters
+  ProjectTag:
+    Description: The Project tag to assign to all AWS resources
+    Type: String
+    MinLength: 3
+    MaxLength: 255
+    Default: mailserver
+  ApplicationTag:
+    Description: The Application tag to assign to all AWS resources
+    Type: String
+    MinLength: 3
+    MaxLength: 255
+    Default: mailserver
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: VPC Configuration
+      Parameters:
+      - VpcId
+      - VpcIpv4CIDR
+      - SubnetId
+    - Label:
+        default: Instance Configuration
+      Parameters:
+      - Name
+      - AMIId
+      - InstanceType
+      - KeyName
+      - TerminationProtection
+      - SwapVolumeSize
+    - Label:
+        default: Tagging Configurations
+      Parameters:
+      - ProjectTag
+      - ApplicationTag
+
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Name}-instance-role    
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+      Policies:
+        - PolicyName: !Sub ${Name}-efs-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - efs:ClientMount
+                  - efs:ClientWrite
+                  - efs:ClientRootAccess
+                Resource:
+                  Fn::Sub:
+                    - arn:aws:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${EFSId}
+                    - EFSId: !ImportValue efs-projects-efs-id
+      Tags:
+        - Key: Name
+          Value: !Ref Name
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${Name}-instance-profile
+      Path: "/"
+      Roles:
+      - Ref: InstanceRole
+
+OutboundToInternetSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Name}-outbound-to-internet-sg
+      GroupDescription: Allow host to connect to standard ports
+      VpcId:
+        Ref: VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS
+        - IpProtocol: udp
+          FromPort: 123
+          ToPort: 123
+          CidrIp: 0.0.0.0/0
+          Description: NTP
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-outbound-to-internet-sg
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
+
+OutboundToVpcSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Name}-outbound-to-vpc-sg
+      GroupDescription: Allow host to connect to standard ports within the VPC
+      VpcId:
+        Ref: VpcId
+      SecurityGroupEgress:
+        - IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: !Ref VpcIpv4CIDR
+          Description: DNS
+        - IpProtocol: tcp          
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp: !Ref VpcIpv4CIDR
+          Description: Allow outbound to EFS
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-outbound-to-vpc-sg
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
+
+  InboundFromInternetSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Name}-inbound-from-internet-sg
+      GroupDescription: Allow inbound traffic
+      VpcId:
+        Ref: VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref VpcIpv4CID
+          Description: SSH
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-inbound-from-internet-sg
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
+
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: !Ref TerminationProtection
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref AMIId
+      InstanceType:
+        Ref: InstanceType
+      KeyName:
+        Ref: KeyName
+      SecurityGroupIds:
+      - Ref: OutboundToInternetSG
+      - Ref: InboundFromInternetSG
+      - Ref: OutboundToVpcSG
+      SubnetId:
+        Ref: SubnetId
+      Tags:
+        - Key: Name
+          Value: !Ref Name
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref RootVolumeSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+        - DeviceName: /dev/sdb
+          Ebs:
+            VolumeSize: !Ref SwapVolumeSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+
+  ServerEIP:
+    Type: AWS::EC2::EIP
+    DeletionPolicy: Retain
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Server
+      Tags:
+        - Key: Name
+          Value: !Ref Name
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
