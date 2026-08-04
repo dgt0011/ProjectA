@@ -51,7 +51,7 @@ concurrency:
 env:
   AWS_REGION: ap-southeast-2
   TEMPLATE_FILE: deploy/cloudformation/parameters.yaml
-  DEFAULT_STACK_NAME: projecta-shared-parameters
+  DEFAULT_STACK_NAME: ProjectA-parameters
 
 jobs:
   # Runs for every PR that touches the template. Purely read-only: creates a

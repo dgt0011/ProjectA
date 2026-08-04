@@ -56,7 +56,7 @@ Parameters:
     Description: >
       Wildcard pattern (no leading '/') restricting which CloudFormation stacks the
       deploy role may operate on. Keep this as narrow as possible.
-    Default: projecta-shared-parameters*
+    Default: ProjectA-*
 
   SsmParameterPrefix:
     Type: String
