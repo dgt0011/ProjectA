@@ -22,8 +22,13 @@ public sealed class ApiFactory : WebApplicationFactory<IApiMarker>, IAsyncLifeti
     // fresh Testcontainers database), and the Jwt:* settings needed to issue/validate tokens for
     // it - set explicitly here via ConfigureAppConfiguration rather than relying on
     // appsettings.json's production placeholders.
-    private const string TestAdminUsername = "test-admin";
-    private const string TestAdminPassword = "Test-Password-123!";
+    // internal (not private) so tests that need to prove the admin account itself is
+    // unaffected by something (e.g. ChangePasswordEndpointTests) can log in as it directly,
+    // rather than relying on the cached token from CreateAuthenticatedClient() still "working"
+    // - a stateless JWT keeps validating regardless of whether the underlying password_hash
+    // changed, so only a fresh login can actually prove the stored credential is untouched.
+    internal const string TestAdminUsername = "test-admin";
+    internal const string TestAdminPassword = "Test-Password-123!";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
