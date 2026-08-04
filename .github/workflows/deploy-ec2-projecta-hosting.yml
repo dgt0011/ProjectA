@@ -1,39 +1,25 @@
-name: Deploy CloudFormation Parameters
+name: Deploy ProjectA Hosting EC2
 
-# Deploys deploy/cloudformation/parameters.yaml (the shared SSM parameters stack
-# consumed by the other templates in deploy/cloudformation) to AWS.
+# Deploys deploy/cloudformation/EC2_projecta_hosting.yaml to AWS.
 #
-# Security model (see docs/deployment/github-actions-aws-deployment.md for full detail):
-#   - No AWS access keys are stored in GitHub. Credentials are obtained per-run via
-#     OpenID Connect (OIDC) federation - aws-actions/configure-aws-credentials
-#     exchanges this run's short-lived GitHub-issued token for a short-lived AWS
-#     session token, which expires automatically and is never persisted anywhere.
-#   - Pull requests only ever run the "plan" job, which previews a change set and
-#     never executes it - untrusted/forked-PR code cannot deploy anything.
-#   - The actual "deploy" job only runs on pushes to main and is gated behind the
-#     aws-production GitHub Environment, which should have required reviewers
-#     configured (see docs) so a human approves every real deployment.
-#   - The role GitHub Actions assumes has no direct SSM permissions - it can only
-#     call CloudFormation APIs and pass one specific execution role to the
-#     CloudFormation service (see deploy/cloudformation/iam/github-actions-oidc-deploy-role.yaml).
 
 on:
   push:
     branches: [main]
     paths:
-      - deploy/cloudformation/parameters.yaml
-      - .github/workflows/deploy-cloudformation-parameters.yml
+      - deploy/cloudformation/EC2_projecta_hosting.yaml
+      - .github/workflows/deploy-ec2-projecta_hosting.yml
   pull_request:
     branches: [main]
     paths:
       - deploy/cloudformation/parameters.yaml
-      - .github/workflows/deploy-cloudformation-parameters.yml
+      - .github/workflows/deploy-ec2-projecta_hosting.yml
   workflow_dispatch:
     inputs:
       stack_name:
         description: CloudFormation stack name to deploy to
         required: false
-        default: projecta-shared-parameters
+        default: ProjectA-EC2-Host
 
 # Least-privilege default for the GITHUB_TOKEN: this workflow only needs to read
 # the repo and mint an OIDC token, nothing else (no issues/PR/packages access).
@@ -45,13 +31,13 @@ permissions:
 # that's already in flight (an interrupted CloudFormation update can leave the
 # stack in UPDATE_ROLLBACK_FAILED, requiring manual intervention to recover).
 concurrency:
-  group: deploy-cloudformation-parameters
+  group: deploy-projecta-ec2-hosting
   cancel-in-progress: false
 
 env:
   AWS_REGION: ap-southeast-2
-  TEMPLATE_FILE: deploy/cloudformation/parameters.yaml
-  DEFAULT_STACK_NAME: ProjectA-parameters
+  TEMPLATE_FILE: deploy/cloudformation/EC2_projecta_hosting.yaml
+  DEFAULT_STACK_NAME: ProjectA-EC2-Host
 
 jobs:
   # Runs for every PR that touches the template. Purely read-only: creates a
@@ -162,8 +148,7 @@ jobs:
             --change-set-name "${{ steps.changeset.outputs.change_set_name }}" || true
 
   # Runs on pushes to main (or a manual dispatch) and actually applies the change.
-  # Gated behind the aws-production Environment - configure required reviewers on
-  # that Environment in repo Settings so this step always needs a human approval.
+  # Gated behind the aws-production Environment
   deploy:
     name: Deploy
     if: github.event_name != 'pull_request'
