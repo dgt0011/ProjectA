@@ -1,3 +1,4 @@
+using ProjectA.Api.Features.Users.ChangePassword;
 using ProjectA.Api.Features.Users.CreateUser;
 using ProjectA.Api.Features.Users.DeleteUser;
 using ProjectA.Api.Features.Users.GetUserById;
@@ -20,5 +21,6 @@ public static class UserEndpointsModule
         group.MapGetUserById();
         group.MapCreateUser();
         group.MapDeleteUser();
+        group.MapChangePassword();
     }
 }
