@@ -85,33 +85,71 @@ jobs:
           STACK_NAME="${DEFAULT_STACK_NAME}"
           CHANGE_SET_NAME="pr-${{ github.event.pull_request.number }}-${{ github.run_id }}"
 
-          # Written to GITHUB_OUTPUT before the deploy call runs (not after) so the
+          # Written to GITHUB_OUTPUT before create-change-set runs (not after) so the
           # name is known - and the change set can still be cleaned up below - even
-          # if `aws cloudformation deploy` itself exits non-zero (e.g. AWS creates
-          # the change set but it ends up in a FAILED state).
+          # if the call itself exits non-zero (e.g. AWS creates the change set but it
+          # ends up in a FAILED state).
           echo "stack_name=$STACK_NAME" >> "$GITHUB_OUTPUT"
           echo "change_set_name=$CHANGE_SET_NAME" >> "$GITHUB_OUTPUT"
 
-          aws cloudformation deploy \
+          # `aws cloudformation deploy` (used by the real "deploy" job below) has no
+          # --change-set-name option at all - it only ever creates an internally-named
+          # change set, which is fine when you let it execute immediately, but leaves
+          # nothing stable to describe/delete afterwards for a preview-only run. Using
+          # the lower-level create-change-set API instead gives full control over the
+          # name, at the cost of having to determine CREATE vs. UPDATE ourselves (unlike
+          # `deploy`, which infers this automatically from whether the stack exists).
+          STACK_STATUS=$(aws cloudformation describe-stacks \
             --stack-name "$STACK_NAME" \
-            --template-file "$TEMPLATE_FILE" \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          if [ "$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "$STACK_STATUS" = "REVIEW_IN_PROGRESS" ]; then
+            CHANGE_SET_TYPE=CREATE
+          else
+            CHANGE_SET_TYPE=UPDATE
+          fi
+
+          aws cloudformation create-change-set \
+            --stack-name "$STACK_NAME" \
+            --template-body "file://${TEMPLATE_FILE}" \
             --role-arn "${{ vars.AWS_CFN_EXECUTION_ROLE_ARN }}" \
-            --no-execute-changeset \
-            --no-fail-on-empty-changeset \
-            --change-set-name "$CHANGE_SET_NAME"
+            --change-set-name "$CHANGE_SET_NAME" \
+            --change-set-type "$CHANGE_SET_TYPE"
+
+          # Change set creation is asynchronous - wait for it to finish computing.
+          # Deliberately not failing the job here: "no changes to preview" is a normal,
+          # expected outcome (e.g. a PR that only touches comments/formatting), not an
+          # error, and is reported as such by the next step instead.
+          aws cloudformation wait change-set-create-complete \
+            --stack-name "$STACK_NAME" \
+            --change-set-name "$CHANGE_SET_NAME" || true
 
       - name: Describe change set
         if: always() && steps.changeset.outputs.change_set_name
         run: |
+          STATUS_REASON=$(aws cloudformation describe-change-set \
+            --stack-name "${{ steps.changeset.outputs.stack_name }}" \
+            --change-set-name "${{ steps.changeset.outputs.change_set_name }}" \
+            --query 'StatusReason' \
+            --output text)
+
           {
             echo "## CloudFormation change set preview"
-            echo '```'
-            aws cloudformation describe-change-set \
-              --stack-name "${{ steps.changeset.outputs.stack_name }}" \
-              --change-set-name "${{ steps.changeset.outputs.change_set_name }}" \
-              --query 'Changes[].ResourceChange.{Action:Action,Resource:LogicalResourceId,Type:ResourceType,Replacement:Replacement}' \
-              --output table
-            echo '```'
+            case "$STATUS_REASON" in
+              *"didn't contain changes"*|*"No updates"*)
+                echo "No changes detected."
+                ;;
+              *)
+                echo '```'
+                aws cloudformation describe-change-set \
+                  --stack-name "${{ steps.changeset.outputs.stack_name }}" \
+                  --change-set-name "${{ steps.changeset.outputs.change_set_name }}" \
+                  --query 'Changes[].ResourceChange.{Action:Action,Resource:LogicalResourceId,Type:ResourceType,Replacement:Replacement}' \
+                  --output table
+                echo '```'
+                ;;
+            esac
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Change sets that are never executed still count towards account limits and
