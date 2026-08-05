@@ -84,13 +84,13 @@ Parameters:
     Type: String
     MinLength: 3
     MaxLength: 255
-    Default: mailserver
+    Default: ProjectA
   ApplicationTag:
     Description: The Application tag to assign to all AWS resources
     Type: String
     MinLength: 3
     MaxLength: 255
-    Default: mailserver
+    Default: ProjectA
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -146,6 +146,16 @@ Resources:
                   Fn::Sub:
                     - arn:aws:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${EFSId}
                     - EFSId: !ImportValue efs-projects-efs-id
+        - PolicyName: !Sub ${Name}-secrets-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                - secretsmanager:GetSecretValue
+                Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ProjectADBConnection-??????"
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ProjectAJWTSigningKey-??????"
       Tags:
         - Key: Name
           Value: !Ref Name
@@ -162,57 +172,57 @@ Resources:
       Roles:
       - Ref: InstanceRole
 
-OutboundToInternetSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${Name}-outbound-to-internet-sg
-      GroupDescription: Allow host to connect to standard ports
-      VpcId:
-        Ref: VpcId
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-          Description: HTTPS
-        - IpProtocol: udp
-          FromPort: 123
-          ToPort: 123
-          CidrIp: 0.0.0.0/0
-          Description: NTP
-      Tags:
-        - Key: Name
-          Value: !Sub ${Name}-outbound-to-internet-sg
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Application
-          Value: !Ref ApplicationTag
+  OutboundToInternetSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupName: !Sub ${Name}-outbound-to-internet-sg
+        GroupDescription: Allow host to connect to standard ports
+        VpcId:
+          Ref: VpcId
+        SecurityGroupEgress:
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            CidrIp: 0.0.0.0/0
+            Description: HTTPS
+          - IpProtocol: udp
+            FromPort: 123
+            ToPort: 123
+            CidrIp: 0.0.0.0/0
+            Description: NTP
+        Tags:
+          - Key: Name
+            Value: !Sub ${Name}-outbound-to-internet-sg
+          - Key: Project
+            Value: !Ref ProjectTag
+          - Key: Application
+            Value: !Ref ApplicationTag
 
-OutboundToVpcSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${Name}-outbound-to-vpc-sg
-      GroupDescription: Allow host to connect to standard ports within the VPC
-      VpcId:
-        Ref: VpcId
-      SecurityGroupEgress:
-        - IpProtocol: udp
-          FromPort: 53
-          ToPort: 53
-          CidrIp: !Ref VpcIpv4CIDR
-          Description: DNS
-        - IpProtocol: tcp          
-          FromPort: 2049
-          ToPort: 2049
-          CidrIp: !Ref VpcIpv4CIDR
-          Description: Allow outbound to EFS
-      Tags:
-        - Key: Name
-          Value: !Sub ${Name}-outbound-to-vpc-sg
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Application
-          Value: !Ref ApplicationTag
+  OutboundToVpcSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupName: !Sub ${Name}-outbound-to-vpc-sg
+        GroupDescription: Allow host to connect to standard ports within the VPC
+        VpcId:
+          Ref: VpcId
+        SecurityGroupEgress:
+          - IpProtocol: udp
+            FromPort: 53
+            ToPort: 53
+            CidrIp: !Ref VpcIpv4CIDR
+            Description: DNS
+          - IpProtocol: tcp
+            FromPort: 2049
+            ToPort: 2049
+            CidrIp: !Ref VpcIpv4CIDR
+            Description: Allow outbound to EFS
+        Tags:
+          - Key: Name
+            Value: !Sub ${Name}-outbound-to-vpc-sg
+          - Key: Project
+            Value: !Ref ProjectTag
+          - Key: Application
+            Value: !Ref ApplicationTag
 
   InboundFromInternetSG:
     Type: AWS::EC2::SecurityGroup
@@ -225,7 +235,7 @@ OutboundToVpcSG:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: !Ref VpcIpv4CID
+          CidrIp: !Ref VpcIpv4CIDR
           Description: SSH
         - IpProtocol: tcp
           FromPort: 80
