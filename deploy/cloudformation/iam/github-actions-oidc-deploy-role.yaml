@@ -25,7 +25,10 @@ Parameters:
     Description: >
       Set to false if a token.actions.githubusercontent.com OIDC provider already
       exists in this AWS account (an account can only have one - creating a second
-      fails with an "already exists" error).
+      fails with an "already exists" error).  Set to false if a separate stack
+      (or a manual/console-created provider) already owns the OIDC provider.
+      Keep set to true if this stack is the first to create it, or if you want this stack
+      to manage the provider's lifecycle.
     Default: 'true'
     AllowedValues: ['true', 'false']
 
