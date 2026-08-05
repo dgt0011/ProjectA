@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  GitHub Actions OIDC federation for deploying deploy/cloudformation/parameters.yaml.
+  GitHub Actions OIDC federation for deploying AWS CloudFormation templates
   Creates (optionally) the GitHub OIDC identity provider, a role GitHub Actions
   assumes via short-lived federated credentials (no long-lived AWS keys stored in
   GitHub), and a separate, narrowly-scoped CloudFormation execution role that the
@@ -25,10 +25,7 @@ Parameters:
     Description: >
       Set to false if a token.actions.githubusercontent.com OIDC provider already
       exists in this AWS account (an account can only have one - creating a second
-      fails with an "already exists" error).  Set to false if a separate stack
-      (or a manual/console-created provider) already owns the OIDC provider.
-      Keep set to true if this stack is the first to create it, or if you want this stack
-      to manage the provider's lifecycle.
+      fails with an "already exists" error).
     Default: 'true'
     AllowedValues: ['true', 'false']
 
@@ -347,6 +344,123 @@ Resources:
                   - ec2:AllocateAddress
                   - ec2:DescribeAddresses
                 Resource: '*'
+
+        # --- EC2: the EFS mount-target security group ---
+        - PolicyName: ec2-efs-security-group-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageEfsSecurityGroup
+                Effect: Allow
+                Action:
+                  - ec2:CreateSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:vpc/*
+              - Sid: TagSecurityGroupOnCreate
+                Effect: Allow
+                Action: ec2:CreateTags
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+                Condition:
+                  StringEquals:
+                    ec2:CreateAction: CreateSecurityGroup
+              - Sid: DescribeSecurityGroupsIsUnscoped
+                Effect: Allow
+                # EC2 Describe* actions don't support resource-level permissions - must be '*'.
+                Action:
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeTags
+                Resource: '*'
+
+        # --- EC2: network interfaces EFS creates behind the scenes for each mount target ---
+        - PolicyName: ec2-efs-mount-target-networking-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CreateEniForMountTargets
+                Effect: Allow
+                # elasticfilesystem:CreateMountTarget has EFS orchestrate an ENI creation using the
+                # caller's own credentials - this is the underlying EC2-side permission that requires.
+                Action: ec2:CreateNetworkInterface
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+              - Sid: TagEniOnCreate
+                Effect: Allow
+                Action: ec2:CreateTags
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*
+                Condition:
+                  StringEquals:
+                    ec2:CreateAction: CreateNetworkInterface
+              - Sid: RequiredUnscopedReads
+                Effect: Allow
+                Action:
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSubnets
+                Resource: '*'
+
+        # --- EFS: the file system itself ---
+        - PolicyName: efs-file-system-unscoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageFileSystem
+                Effect: Allow
+                # No elasticfilesystem action supports resource-level permissions per AWS's Service
+                # Authorization Reference - '*' is the tightest this service's IAM model allows.
+                Action:
+                  - elasticfilesystem:CreateFileSystem
+                  - elasticfilesystem:DescribeFileSystems
+                  - elasticfilesystem:UpdateFileSystem
+                  - elasticfilesystem:PutBackupPolicy
+                  - elasticfilesystem:DescribeBackupPolicy
+                  - elasticfilesystem:DescribeTags
+                  - elasticfilesystem:ListTagsForResource
+                Resource: '*'
+              - Sid: TagFileSystemOnCreateOnly
+                Effect: Allow
+                Action: elasticfilesystem:TagResource
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    elasticfilesystem:CreateAction: CreateFileSystem
+
+        # --- EFS: mount targets (one per private subnet) ---
+        - PolicyName: efs-mount-targets-unscoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageMountTargets
+                Effect: Allow
+                Action:
+                  - elasticfilesystem:CreateMountTarget
+                  - elasticfilesystem:DescribeMountTargets
+                  - elasticfilesystem:DescribeMountTargetSecurityGroups
+                  - elasticfilesystem:ModifyMountTargetSecurityGroups
+                Resource: '*'
+
+        # --- EFS: the access point ---
+        - PolicyName: efs-access-point-unscoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageAccessPoint
+                Effect: Allow
+                Action:
+                  - elasticfilesystem:CreateAccessPoint
+                  - elasticfilesystem:DescribeAccessPoints
+                Resource: '*'
+              - Sid: TagAccessPointOnCreateOnly
+                Effect: Allow
+                Action: elasticfilesystem:TagResource
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    elasticfilesystem:CreateAction: CreateAccessPoint
 
 Outputs:
   GitHubActionsDeployRoleArn:
