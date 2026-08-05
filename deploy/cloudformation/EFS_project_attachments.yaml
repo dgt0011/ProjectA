@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation Template to create an Elastic File System (EFS) for the Projects website attachments
 Parameters:
 # VPC Specific Configurations
@@ -89,7 +89,7 @@ Parameters:
     Default: storage
 
 Conditions:
-  IsProvisionedThroughputSet: !Equals [!Ref EFSProvisionedThroughput, provisioned]
+  IsProvisionedThroughputSet: !Equals [!Ref EFSThroughputMode, provisioned]
 
 Resources:
 
@@ -103,6 +103,13 @@ Resources:
         FromPort: 2049
         ToPort: 2049
         CidrIp: !Ref VpcIpv4CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-efs-sg
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref ApplicationTag
 
   EFS:
     Type: AWS::EFS::FileSystem

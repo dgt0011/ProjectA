@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  GitHub Actions OIDC federation for deploying deploy/cloudformation/parameters.yaml.
+  GitHub Actions OIDC federation for deploying AWS CloudFormation templates
   Creates (optionally) the GitHub OIDC identity provider, a role GitHub Actions
   assumes via short-lived federated credentials (no long-lived AWS keys stored in
   GitHub), and a separate, narrowly-scoped CloudFormation execution role that the
@@ -25,10 +25,7 @@ Parameters:
     Description: >
       Set to false if a token.actions.githubusercontent.com OIDC provider already
       exists in this AWS account (an account can only have one - creating a second
-      fails with an "already exists" error).  Set to false if a separate stack
-      (or a manual/console-created provider) already owns the OIDC provider.
-      Keep set to true if this stack is the first to create it, or if you want this stack
-      to manage the provider's lifecycle.
+      fails with an "already exists" error).
     Default: 'true'
     AllowedValues: ['true', 'false']
 
@@ -347,6 +344,18 @@ Resources:
                   - ec2:AllocateAddress
                   - ec2:DescribeAddresses
                 Resource: '*'
+
+        # --- EFS ---
+        - PolicyName: efs-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageFileSystem
+                Effect: Allow
+                Action: ec2:AssociateAddress
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:elastic-ip/*
 
 Outputs:
   GitHubActionsDeployRoleArn:
