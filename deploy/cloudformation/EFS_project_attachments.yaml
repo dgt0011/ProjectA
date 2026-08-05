@@ -105,7 +105,7 @@ Resources:
         CidrIp: !Ref VpcIpv4CIDR
       Tags:
         - Key: Name
-          Value: !Sub ${Name}-efs-sg
+          Value: !Sub ${EFSFileSystemName}-efs-sg
         - Key: Project
           Value: !Ref ProjectTag
         - Key: Application
