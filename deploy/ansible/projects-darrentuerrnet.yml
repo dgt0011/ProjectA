@@ -16,4 +16,6 @@
     - auto_update
     - swap
     - efs-mount
+    - webapp
     - nginx
+    - letsencrypt

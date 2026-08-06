@@ -1,0 +1,63 @@
+---
+
+- name: Install certbot and the nginx plugin
+  apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: latest
+    update_cache: yes
+
+# Deliberately `certonly`, not the default `certbot --nginx` "run" mode:
+# certonly only obtains/renews the certificate and does not touch nginx's
+# config itself, leaving that fully under ansible's control (see the
+# "Deploy the HTTPS virtual host" task below). The --nginx flag here just
+# selects the nginx *authenticator* - certbot parses the existing on-disk
+# vhost to find a server block for the domain and briefly reloads nginx
+# itself to serve the HTTP-01 challenge.
+#
+# `creates` makes this idempotent: once the certificate exists, ansible
+# skips this task on every subsequent run rather than re-requesting it
+# (Let's Encrypt rate-limits repeated issuance for the same domain).
+# Renewals are handled separately, below, by certbot's own systemd timer.
+- name: Obtain the Let's Encrypt certificate (first issuance only)
+  command: >
+    certbot certonly --nginx
+    -d {{ letsencrypt_domain }}
+    -m {{ letsencrypt_email }}
+    --agree-tos
+    --non-interactive
+    --no-eff-email
+  args:
+    creates: "/etc/letsencrypt/live/{{ letsencrypt_domain }}/fullchain.pem"
+
+- name: Ensure the certbot renewal timer is enabled and running
+  service:
+    name: certbot.timer
+    state: started
+    enabled: yes
+
+- name: Install a deploy-hook to reload nginx after each certificate renewal
+  copy:
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+    content: |
+      #!/bin/sh
+      systemctl reload nginx
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the HTTPS-enabled virtual host now that a certificate exists
+  template:
+    src: vhost-ssl.conf.j2
+    dest: "/etc/nginx/sites-enabled/{{ letsencrypt_domain }}.conf"
+    owner: root
+    group: root
+    mode: "0444"
+  notify: reload nginx
+
+# Force the reload now rather than waiting for the play's end-of-run handler
+# flush, so the run finishes with HTTPS actually serving traffic rather than
+# just the config file on disk saying so.
+- name: Apply the HTTPS virtual host immediately
+  meta: flush_handlers

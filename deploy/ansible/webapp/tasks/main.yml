@@ -1,0 +1,38 @@
+---
+
+- name: Deploy the projecta-web systemd unit
+  template:
+    src: projecta-web.service.j2
+    dest: /etc/systemd/system/projecta-web.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: webapp_unit
+  notify: restart projecta-web
+
+- name: Reload systemd if the unit file changed
+  systemd:
+    daemon_reload: yes
+  when: webapp_unit.changed
+
+# The unit is safe to enable even before the app has ever been deployed -
+# enabling just creates the boot-time symlink. Starting it before any binary
+# exists at {{ webapp_dir }}/{{ webapp_executable }} would fail, so that part
+# is conditional on the executable actually being present. The
+# deploy-web-projecta.yml GitHub workflow starts/restarts the service itself
+# once it has actually copied the app into place.
+- name: Check whether the app has been deployed yet
+  stat:
+    path: "{{ webapp_dir }}/{{ webapp_executable }}"
+  register: webapp_binary
+
+- name: Ensure the projecta-web service is enabled on boot
+  service:
+    name: projecta-web
+    enabled: yes
+
+- name: Start the projecta-web service if the app has already been deployed
+  service:
+    name: projecta-web
+    state: started
+  when: webapp_binary.stat.exists

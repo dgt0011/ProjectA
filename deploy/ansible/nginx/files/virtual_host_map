@@ -6,7 +6,6 @@ server {
 
        root /mnt/data/web;
 
-
        location / {
                try_files $uri $uri/ =404;
        }

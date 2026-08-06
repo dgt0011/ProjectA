@@ -1,0 +1,170 @@
+name: Deploy ProjectA.Web to Hosting EC2
+
+# Publishes ProjectA.Web and copies it onto the running EC2 instance's
+# /mnt/data/web directory (the EFS mount the efs-mount ansible role sets up),
+# then restarts the projecta-web systemd service defined by the webapp
+# ansible role so the new build takes effect.
+#
+# Reaches the instance the same way run-ansible-projecta-hosting.yml does -
+# an AWS Systems Manager Session Manager port-forwarding tunnel to port 22 -
+# since the security group only allows SSH from inside the VPC. Reuses that
+# workflow's IAM role/environment: the AWS capability needed (start an SSM
+# session to the tagged instance) is identical whether the thing running
+# over the tunnel is ansible-playbook or rsync/ssh.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ProjectA.Web/**
+      - .github/workflows/deploy-web-projecta.yml
+  workflow_dispatch:
+    inputs:
+      instance_name_tag:
+        description: Value of the EC2 instance's Name tag to target
+        required: false
+        default: projects-darrentuer-net
+
+permissions:
+  contents: read
+  id-token: write
+
+# Never run two deploys concurrently - an rsync mid-copy plus a service
+# restart racing another one could leave a half-written, crash-looping app.
+concurrency:
+  group: deploy-projecta-web
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-2
+  LOCAL_TUNNEL_PORT: 2222
+  WEBAPP_DIR: /mnt/data/web
+  WEBAPP_PORT: 5220
+  WEBAPP_SERVICE: projecta-web
+
+jobs:
+  deploy:
+    name: Publish and deploy
+    runs-on: ubuntu-latest
+    # Same environment as run-ansible-projecta-hosting.yml: required reviewers
+    # gate this the same way, since it also ends in root-privileged actions
+    # (systemctl restart) on the production server.
+    environment: aws-ansible
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish ProjectA.Web (self-contained, linux-x64)
+        run: |
+          dotnet publish ProjectA.Web/ProjectA.Web.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -o "$RUNNER_TEMP/publish"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: ${{ vars.AWS_ANSIBLE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-webdeploy-${{ github.run_id }}
+
+      - name: Install session-manager-plugin
+        run: |
+          curl -sSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+            -o /tmp/session-manager-plugin.deb
+          sudo dpkg -i /tmp/session-manager-plugin.deb
+          session-manager-plugin --version
+
+      - name: Resolve target instance ID
+        id: instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Name,Values=${{ inputs.instance_name_tag || 'projects-darrentuer-net' }}" \
+              "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "::error::No running instance found with the given Name tag"
+            exit 1
+          fi
+
+          echo "Target instance: $INSTANCE_ID"
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Write SSH private key
+        run: |
+          umask 077
+          printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > "$RUNNER_TEMP/ec2_key.pem"
+          chmod 600 "$RUNNER_TEMP/ec2_key.pem"
+
+      - name: Start SSM port-forwarding tunnel
+        run: |
+          aws ssm start-session \
+            --target "${{ steps.instance.outputs.instance_id }}" \
+            --document-name AWS-StartPortForwardingSession \
+            --parameters "{\"portNumber\":[\"22\"],\"localPortNumber\":[\"${LOCAL_TUNNEL_PORT}\"]}" \
+            > "$RUNNER_TEMP/ssm-session.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/ssm-session.pid"
+
+          for i in $(seq 1 30); do
+            if (exec 3<>"/dev/tcp/127.0.0.1/${LOCAL_TUNNEL_PORT}") 2>/dev/null; then
+              exec 3<&- 3>&-
+              echo "Tunnel is up on 127.0.0.1:${LOCAL_TUNNEL_PORT}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Tunnel did not come up after 60s"
+          cat "$RUNNER_TEMP/ssm-session.log"
+          exit 1
+
+      - name: Sync published app to /mnt/data/web
+        run: |
+          rsync -avz --delete \
+            -e "ssh -p ${LOCAL_TUNNEL_PORT} -i ${RUNNER_TEMP}/ec2_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            "$RUNNER_TEMP/publish/" \
+            "admin@127.0.0.1:${WEBAPP_DIR}/"
+
+      - name: Restart the app service
+        run: |
+          ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            admin@127.0.0.1 \
+            "chmod +x ${WEBAPP_DIR}/ProjectA.Web && sudo systemctl restart ${WEBAPP_SERVICE}"
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 15); do
+            if ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
+                 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                 admin@127.0.0.1 \
+                 "curl -sf -o /dev/null http://127.0.0.1:${WEBAPP_PORT}/"; then
+              echo "App is responding on port ${WEBAPP_PORT}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::App did not respond on port ${WEBAPP_PORT} after restart"
+          ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            admin@127.0.0.1 \
+            "sudo systemctl status ${WEBAPP_SERVICE} --no-pager; sudo journalctl -u ${WEBAPP_SERVICE} --no-pager -n 50" || true
+          exit 1
+
+      - name: Close tunnel and clean up key material
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/ssm-session.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/ssm-session.pid")" 2>/dev/null || true
+          fi
+          shred -u "$RUNNER_TEMP/ec2_key.pem" 2>/dev/null || rm -f "$RUNNER_TEMP/ec2_key.pem"

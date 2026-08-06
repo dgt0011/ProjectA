@@ -1,0 +1,6 @@
+---
+
+- name: restart projecta-web
+  service:
+    name: projecta-web
+    state: restarted
