@@ -501,6 +501,7 @@ Resources:
                   - ssm:DescribeSessions
                   - ssm:DescribeInstanceInformation
                   - ssm:GetConnectionStatus
+                  - ssm:StartSession
                 Resource: '*'
               - Sid: EndOwnSessionsOnly
                 Effect: Allow
