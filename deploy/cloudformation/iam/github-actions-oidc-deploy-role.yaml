@@ -464,6 +464,52 @@ Resources:
                   StringEquals:
                     elasticfilesystem:CreateAction: CreateAccessPoint
 
+  GitHubActionsAnsibleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: gha-projecta-ansible
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:<org>/<repo>:environment:aws-ansible
+      Policies:
+        - PolicyName: ssm-session-scoped
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: StartSessionToTaggedInstanceOnly
+                Effect: Allow
+                Action: ssm:StartSession
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                  - !Sub arn:aws:ssm:${AWS::Region}::document/AWS-StartPortForwardingSession
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/Name: projects-darrentuer-net
+              - Sid: RequiredUnscopedReads
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ssm:DescribeSessions
+                  - ssm:DescribeInstanceInformation
+                  - ssm:GetConnectionStatus
+                Resource: '*'
+              - Sid: EndOwnSessionsOnly
+                Effect: Allow
+                Action:
+                  - ssm:TerminateSession
+                  - ssm:ResumeSession
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:session/*
+
 Outputs:
   GitHubActionsDeployRoleArn:
     Description: >
@@ -476,3 +522,9 @@ Outputs:
       Set this as the AWS_CFN_EXECUTION_ROLE_ARN repository/environment variable
       used by .github/workflows/deploy-cloudformation-parameters.yml.
     Value: !GetAtt CfnExecutionRole.Arn
+
+  GitHubActionsAnsibleRoleArn:
+    Description: >
+      Set this as the AWS_ANSIBLE_ROLE_ARN repository/environment variable used by
+      .github/workflows/deploy-web-projecta.yml.
+    Value: !GetAtt GitHubActionsAnsibleRole.Arn
