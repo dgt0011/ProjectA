@@ -1,0 +1,16 @@
+---
+
+- name: create the /mnt/data directory
+  file: 
+    path: /mnt/data
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+
+- name: Mount the EFS file system
+  mount:
+    src: "{{ efs_dns_name }}:/"
+    path: /mnt/data
+    fstype: nfs
+    opts: rw,sync,hard
+    state: mounted
