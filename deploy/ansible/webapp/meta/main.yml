@@ -1,0 +1,6 @@
+---
+
+# Needs /mnt/data to exist and be mounted before defining a service whose
+# working directory and executable live under it.
+dependencies:
+  - role: efs-mount

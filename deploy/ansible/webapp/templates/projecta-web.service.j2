@@ -1,0 +1,21 @@
+[Unit]
+Description=ProjectA.Web
+After=network.target mnt-data.mount
+# Best-effort ordering: if /mnt/data is an EFS mount unit, wait for it. Falls
+# back to just network.target if it isn't a systemd-managed mount (e.g. an
+# /etc/fstab entry handled by the "mount" module instead) - After= on a unit
+# name that doesn't exist is simply ignored by systemd, not an error.
+
+[Service]
+Type=simple
+User={{ admin_user }}
+Group={{ admin_user }}
+WorkingDirectory={{ webapp_dir }}
+ExecStart={{ webapp_dir }}/{{ webapp_executable }}
+Restart=on-failure
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:{{ webapp_port }}
+
+[Install]
+WantedBy=multi-user.target

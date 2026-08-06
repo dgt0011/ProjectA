@@ -1,0 +1,37 @@
+---
+
+# Package updates are already handled by the applications and auto_update
+# roles - doing it again here just duplicated work and slowed every run down.
+
+- name: Install nginx
+  apt:
+    name: nginx
+    state: latest
+    update_cache: yes
+
+- name: Remove the default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Deploy the reverse proxy virtual host
+  template:
+    src: vhost.conf.j2
+    dest: "/etc/nginx/sites-enabled/{{ nginx_server_name }}.conf"
+    owner: root
+    group: root
+    mode: "0444"
+  notify: reload nginx
+
+- name: Remove the old static-file map site, if present
+  file:
+    path: /etc/nginx/sites-enabled/map
+    state: absent
+  notify: reload nginx
+
+- name: Ensure nginx is enabled and running
+  service:
+    name: nginx
+    state: started
+    enabled: yes

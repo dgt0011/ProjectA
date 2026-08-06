@@ -6,9 +6,8 @@
   become_method: sudo
 
   vars:
-    tika_version: 3.1.0
     admin_user: admin
-    efs_dns_name: fs-07f628c47bfe54902.efs.ap-southeast-2.amazonaws.com
+    efs_dns_name: fs-0bf11378f69336002.efs.ap-southeast-2.amazonaws.com
 
   roles:
     - core
@@ -17,3 +16,6 @@
     - auto_update
     - swap
     - efs-mount
+    - webapp
+    - nginx
+    - letsencrypt

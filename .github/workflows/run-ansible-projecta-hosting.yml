@@ -1,0 +1,149 @@
+name: Run Ansible Against ProjectA Hosting EC2
+
+# Configures/reconfigures the running EC2 instance (created by
+# deploy-ec2-projecta-hosting.yml) by executing
+# deploy/ansible/projects-darrentuerrnet.yml against it.
+#
+# The instance only allows SSH (port 22) from within the VPC CIDR - not from
+# the internet - so GitHub's hosted runners cannot reach it directly. Instead
+# this workflow opens an AWS Systems Manager Session Manager port-forwarding
+# tunnel (local runner port -> SSM -> instance port 22) and runs Ansible over
+# SSH through that tunnel. No inbound security group rule, bastion host, or
+# long-lived SSH-reachable network path is required.
+#
+# Manual-only: server configuration changes should be a deliberate, reviewed
+# action, not something that fires automatically on every push.
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_name_tag:
+        description: Value of the EC2 instance's Name tag to target
+        required: false
+        default: projects-darrentuer-net
+      extra_args:
+        description: Extra ansible-playbook arguments (e.g. --check --diff, or --tags core)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+# Never run two Ansible passes against the same host concurrently - concurrent
+# apt/package-manager runs or conflicting handler restarts could leave the
+# server in an inconsistent state.
+concurrency:
+  group: ansible-projecta-hosting
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-2
+  LOCAL_TUNNEL_PORT: 2222
+  PLAYBOOK_FILE: deploy/ansible/projects-darrentuerrnet.yml
+
+jobs:
+  ansible:
+    name: Run Ansible playbook
+    runs-on: ubuntu-latest
+    # Dedicated environment: gates this behind required reviewers the same way
+    # aws-production does for CloudFormation deploys, and restricts the OIDC
+    # trust policy's `sub` claim to runs that reference this environment.
+    # This job can execute arbitrary commands on the server as root (via
+    # become/sudo), so it should be reviewed at least as carefully as a
+    # CloudFormation deploy - arguably more so.
+    environment: aws-ansible
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: ${{ vars.AWS_ANSIBLE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-ansible-${{ github.run_id }}
+
+      - name: Install session-manager-plugin
+        run: |
+          curl -sSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+            -o /tmp/session-manager-plugin.deb
+          sudo dpkg -i /tmp/session-manager-plugin.deb
+          session-manager-plugin --version
+
+      - name: Install Ansible
+        run: |
+          pip install --break-system-packages "ansible-core>=2.16,<2.18"
+          ansible --version
+
+      - name: Resolve target instance ID
+        id: instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Name,Values=${{ inputs.instance_name_tag }}" \
+              "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "::error::No running instance found with tag Name=${{ inputs.instance_name_tag }}"
+            exit 1
+          fi
+
+          echo "Target instance: $INSTANCE_ID"
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Write SSH private key
+        run: |
+          umask 077
+          printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > "$RUNNER_TEMP/ec2_key.pem"
+          chmod 600 "$RUNNER_TEMP/ec2_key.pem"
+
+      - name: Start SSM port-forwarding tunnel
+        run: |
+          aws ssm start-session \
+            --target "${{ steps.instance.outputs.instance_id }}" \
+            --document-name AWS-StartPortForwardingSession \
+            --parameters "{\"portNumber\":[\"22\"],\"localPortNumber\":[\"${LOCAL_TUNNEL_PORT}\"]}" \
+            > "$RUNNER_TEMP/ssm-session.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/ssm-session.pid"
+
+          # Port forwarding is asynchronous - poll until the local end is accepting
+          # connections instead of a fixed sleep.
+          for i in $(seq 1 30); do
+            if (exec 3<>"/dev/tcp/127.0.0.1/${LOCAL_TUNNEL_PORT}") 2>/dev/null; then
+              exec 3<&- 3>&-
+              echo "Tunnel is up on 127.0.0.1:${LOCAL_TUNNEL_PORT}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Tunnel did not come up after 60s"
+          cat "$RUNNER_TEMP/ssm-session.log"
+          exit 1
+
+      - name: Write Ansible inventory
+        run: |
+          cat > "$RUNNER_TEMP/inventory.ini" <<EOF
+          [all]
+          server ansible_host=127.0.0.1 ansible_port=${LOCAL_TUNNEL_PORT} ansible_user=admin ansible_ssh_private_key_file=${RUNNER_TEMP}/ec2_key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+          EOF
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook \
+            -i "$RUNNER_TEMP/inventory.ini" \
+            "$PLAYBOOK_FILE" \
+            ${{ inputs.extra_args }}
+
+      # Always runs, even if the playbook step failed, so the tunnel and key
+      # material never outlive the job.
+      - name: Close tunnel and clean up key material
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/ssm-session.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/ssm-session.pid")" 2>/dev/null || true
+          fi
+          shred -u "$RUNNER_TEMP/ec2_key.pem" 2>/dev/null || rm -f "$RUNNER_TEMP/ec2_key.pem"

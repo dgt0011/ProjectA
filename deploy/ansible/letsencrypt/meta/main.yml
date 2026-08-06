@@ -1,0 +1,9 @@
+---
+
+# Requires the nginx role's bootstrap HTTP vhost to already be in place and
+# nginx already running, both for certbot's --nginx authenticator (it parses
+# the on-disk config directly and needs a running nginx to reload) and
+# because this role overwrites the same vhost file nginx deployed with the
+# final HTTPS version.
+dependencies:
+  - role: nginx

@@ -1,0 +1,34 @@
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name {{ letsencrypt_domain }};
+
+    # Kept on port 80 (rather than removed) so certbot's --nginx authenticator
+    # has a server block to work with on every renewal, and so any plain-HTTP
+    # visitor still gets a valid response instead of a connection refusal.
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name {{ letsencrypt_domain }};
+
+    ssl_certificate     /etc/letsencrypt/live/{{ letsencrypt_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ letsencrypt_domain }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    location / {
+        proxy_pass http://{{ nginx_upstream_host }}:{{ nginx_upstream_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

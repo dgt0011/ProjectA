@@ -1,0 +1,17 @@
+---
+
+# Where the deploy-web-projecta.yml GitHub workflow publishes the app to.
+# Matches nginx's efs-mount-backed static root, since that whole directory
+# lives on the EFS mount created by the efs-mount role.
+webapp_dir: /mnt/data/web
+
+# Self-contained apphost executable name - matches the project/assembly name
+# (ProjectA.Web.csproj has no <AssemblyName> override), built with
+# `dotnet publish -r linux-x64 --self-contained true`.
+webapp_executable: ProjectA.Web
+
+# Must match nginx's nginx_upstream_port default - the app listens here and
+# nginx reverse-proxies to it. Not derived automatically from the nginx role's
+# default to keep this role's defaults self-contained; if you change one,
+# change the other.
+webapp_port: 5220

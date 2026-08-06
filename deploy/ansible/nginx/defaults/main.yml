@@ -1,0 +1,11 @@
+---
+
+# Public hostname nginx will answer on and (later) the domain the letsencrypt
+# role requests a certificate for. Kept as a single source of truth so both
+# roles stay in sync.
+nginx_server_name: projects.darrentuer.net
+
+# Where the ProjectA.Web app listens. Matches ProjectA.Web/Properties/launchSettings.json's
+# "http" profile (applicationUrl: http://localhost:5220).
+nginx_upstream_host: 127.0.0.1
+nginx_upstream_port: 5220
