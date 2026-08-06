@@ -479,7 +479,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: repo:<org>/<repo>:environment:aws-ansible
+                token.actions.githubusercontent.com:sub: repo:${GitHubOrg}/${GitHubRepo}:environment:aws-ansible
       Policies:
         - PolicyName: ssm-session-scoped
           PolicyDocument:
