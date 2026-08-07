@@ -1,0 +1,16 @@
+---
+
+# Ansible Galaxy collections required by roles in this directory. Installed on
+# the *control node* (the GitHub Actions runner, via `ansible-galaxy collection
+# install -r deploy/ansible/requirements.yml`) before ansible-playbook runs -
+# collections aren't something a play can install on itself, since the modules
+# they provide have to already exist locally before ansible-playbook can even
+# parse a task that uses one.
+collections:
+  # Provides the `timezone` module used by the core role.
+  - name: community.general
+
+  # Provides the `mount` module used by the efs-mount role. Both `timezone`
+  # and `mount` were removed from ansible-core's builtin module set in
+  # ansible-core 2.10+ and now live in these collections instead.
+  - name: ansible.posix
