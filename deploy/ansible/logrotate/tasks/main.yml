@@ -6,7 +6,8 @@
     upgrade: yes
     update_cache: yes
     cache_valid_time: 86400 #One day
-    
+    lock_timeout: 300
+
 - name: Install and set up system packages
   package:
     name: logrotate

@@ -1,5 +1,24 @@
 ---
 
+# On first boot, cloud-init/unattended-upgrades is often still running apt in
+# the background, holding /var/lib/dpkg/lock-frontend. core is always the
+# first role in the play, so wait here for that to clear rather than letting
+# whichever apt/package task happens to run next fail with "Could not get
+# lock ... held by process ... (unattended-upgr)". Uses flock rather than
+# fuser/lsof so it doesn't depend on a package (psmisc/lsof) that may not be
+# installed yet.
+- name: Wait for the apt/dpkg lock to be free
+  shell: |
+    for i in $(seq 1 60); do
+      if flock -n /var/lib/dpkg/lock-frontend -c true 2>/dev/null; then
+        exit 0
+      fi
+      sleep 5
+    done
+    echo "Timed out after 5 minutes waiting for the apt/dpkg lock" >&2
+    exit 1
+  changed_when: false
+
 - name: set the timezone
   timezone:
     hwclock: UTC
