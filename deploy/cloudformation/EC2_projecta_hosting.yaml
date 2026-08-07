@@ -265,6 +265,8 @@ Resources:
         Ref: InstanceType
       KeyName:
         Ref: KeyName
+      MetadataOptions:
+        HttpTokens: "required"
       SecurityGroupIds:
       - Ref: OutboundToInternetSG
       - Ref: InboundFromInternetSG
@@ -279,7 +281,7 @@ Resources:
         - Key: Application
           Value: !Ref ApplicationTag
       BlockDeviceMappings:
-        - DeviceName: /dev/sda1
+        - DeviceName: /dev/xvda
           Ebs:
             VolumeSize: !Ref RootVolumeSize
             VolumeType: gp3

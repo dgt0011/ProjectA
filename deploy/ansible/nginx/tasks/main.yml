@@ -8,6 +8,7 @@
     name: nginx
     state: latest
     update_cache: yes
+    lock_timeout: 300
 
 - name: Remove the default nginx site
   file:
