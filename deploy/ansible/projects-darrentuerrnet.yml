@@ -20,3 +20,4 @@
     - webapi
     - nginx
     - letsencrypt
+    - fail2ban
