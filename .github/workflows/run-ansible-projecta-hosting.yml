@@ -1,4 +1,4 @@
-name: Run Ansible Against ProjectA Hosting EC2
+name: 4. Deploy Ansible to Hosting
 
 # Configures/reconfigures the running EC2 instance (created by
 # deploy-ec2-projecta-hosting.yml) by executing

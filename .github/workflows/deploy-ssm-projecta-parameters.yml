@@ -1,4 +1,4 @@
-name: Deploy CloudFormation Parameters
+name: 1. Deploy Parameters
 
 # Deploys deploy/cloudformation/parameters.yaml (the shared SSM parameters stack
 # consumed by the other templates in deploy/cloudformation) to AWS.

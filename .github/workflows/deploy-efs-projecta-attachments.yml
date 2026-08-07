@@ -1,4 +1,4 @@
-name: Deploy ProjectA Elastic File Storage (EFS) for Attachments
+name: 2. Deploy EFS
 
 # Deploys deploy/cloudformation/EFS_project_attachments.yaml to AWS.
 #
