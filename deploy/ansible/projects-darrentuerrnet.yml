@@ -17,5 +17,6 @@
     - swap
     - efs-mount
     - webapp
+    - webapi
     - nginx
     - letsencrypt

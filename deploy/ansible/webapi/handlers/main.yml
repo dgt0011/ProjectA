@@ -1,0 +1,6 @@
+---
+
+- name: restart projecta-api
+  service:
+    name: projecta-api
+    state: restarted

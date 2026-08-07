@@ -1,0 +1,17 @@
+---
+
+# Where deploy-api-projecta.yml publishes the API to. Placed under /mnt/data
+# for consistency with webapp's webapp_dir - the API itself doesn't need EFS
+# persistence any more than webapp does, this just keeps both deployed apps
+# in one predictable, already-permissioned location.
+webapi_dir: /mnt/data/api
+
+# Self-contained apphost executable name - matches the project/assembly name
+# (ProjectA.Api.csproj has no <AssemblyName> override), built with
+# `dotnet publish -r linux-x64 --self-contained true`.
+webapi_executable: ProjectA.Api
+
+# Must match ProjectA.Web's appsettings.json ApiSettings:BaseUrl
+# (http://localhost:5031) - ProjectA.Web calls the API at this port directly,
+# there is no nginx proxying involved on this side.
+webapi_port: 5031

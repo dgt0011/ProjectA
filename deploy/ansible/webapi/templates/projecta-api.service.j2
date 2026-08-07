@@ -1,0 +1,17 @@
+[Unit]
+Description=ProjectA.Api
+After=network.target mnt-data.mount
+
+[Service]
+Type=simple
+User={{ admin_user }}
+Group={{ admin_user }}
+WorkingDirectory={{ webapi_dir }}
+ExecStart={{ webapi_dir }}/{{ webapi_executable }}
+Restart=on-failure
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:{{ webapi_port }}
+
+[Install]
+WantedBy=multi-user.target
