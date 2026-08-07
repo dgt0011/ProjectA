@@ -6,7 +6,13 @@
       - fail2ban
     state: latest
     update_cache: yes
-    lock_timeout: 300
+    lock_timeout: 300s
+
+- name: Create jail config
+  copy:
+    src: 99-local-baseline.conf
+    dest: /etc/fail2ban/jail.d/99-local-baseline.conf
+    mode: 775
 
 - name: Enable the service
   service:

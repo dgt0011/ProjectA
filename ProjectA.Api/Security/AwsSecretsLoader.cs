@@ -97,6 +97,8 @@ internal static class AwsSecretsLoader
                 Password = RequireString(root, "password", secretName)
             };
 
+            connectionStringBuilder.Database = "postgresdb";
+
             // Matches every other connection string already in this app (appsettings.json,
             // appsettings.Development.json, ProjectA.Api.Tests/ApiFactory.cs): without this,
             // Npgsql attempts a GSS/Kerberos handshake first and fails with
