@@ -1,4 +1,4 @@
-name: Deploy ProjectA Hosting EC2
+name: 3. Deploy EC2
 
 # Deploys deploy/cloudformation/EC2_projecta_hosting.yaml to AWS.
 #

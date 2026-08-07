@@ -1,4 +1,4 @@
-name: Deploy ProjectA.Api to Hosting EC2
+name: 5. Deploy ProjectA.Api
 
 # Publishes ProjectA.Api and copies it onto the running EC2 instance's
 # /mnt/data/api directory, then restarts the projecta-api systemd service

@@ -1,4 +1,4 @@
-name: Deploy ProjectA.Web to Hosting EC2
+name: 6. Deploy ProjectA.Web
 
 # Publishes ProjectA.Web and copies it onto the running EC2 instance's
 # /mnt/data/web directory (the EFS mount the efs-mount ansible role sets up),
