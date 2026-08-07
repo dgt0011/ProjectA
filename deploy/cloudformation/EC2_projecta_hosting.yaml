@@ -265,6 +265,8 @@ Resources:
         Ref: InstanceType
       KeyName:
         Ref: KeyName
+      MetadataOptions:
+        HttpTokens: "required"
       SecurityGroupIds:
       - Ref: OutboundToInternetSG
       - Ref: InboundFromInternetSG
