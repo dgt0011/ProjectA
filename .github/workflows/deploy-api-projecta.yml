@@ -1,23 +1,21 @@
-name: Deploy ProjectA.Web to Hosting EC2
+name: Deploy ProjectA.Api to Hosting EC2
 
-# Publishes ProjectA.Web and copies it onto the running EC2 instance's
-# /mnt/data/web directory (the EFS mount the efs-mount ansible role sets up),
-# then restarts the projecta-web systemd service defined by the webapp
-# ansible role so the new build takes effect.
+# Publishes ProjectA.Api and copies it onto the running EC2 instance's
+# /mnt/data/api directory, then restarts the projecta-api systemd service
+# defined by the webapi ansible role. Kept separate from
+# deploy-web-projecta.yml (rather than one combined workflow) so the API can
+# be deployed/restarted independently of the web app, and vice versa.
 #
-# Reaches the instance the same way run-ansible-projecta-hosting.yml does -
+# Reaches the instance the same way the other deploy/ansible workflows do -
 # an AWS Systems Manager Session Manager port-forwarding tunnel to port 22 -
-# since the security group only allows SSH from inside the VPC. Reuses that
-# workflow's IAM role/environment: the AWS capability needed (start an SSM
-# session to the tagged instance) is identical whether the thing running
-# over the tunnel is ansible-playbook or rsync/ssh.
+# since the security group only allows SSH from inside the VPC.
 
 on:
   push:
     branches: [main]
     paths:
-      - ProjectA.Web/**
-      - .github/workflows/deploy-web-projecta.yml
+      - ProjectA.Api/**
+      - .github/workflows/deploy-api-projecta.yml
   workflow_dispatch:
     inputs:
       instance_name_tag:
@@ -32,19 +30,19 @@ permissions:
 # Never run two deploys concurrently - an rsync mid-copy plus a service
 # restart racing another one could leave a half-written, crash-looping app.
 concurrency:
-  group: deploy-projecta-web
+  group: deploy-projecta-api
   cancel-in-progress: false
 
 env:
   AWS_REGION: ap-southeast-2
   LOCAL_TUNNEL_PORT: 2222
-  WEBAPP_DIR: /mnt/data/web
-  WEBAPP_PORT: 5220
-  WEBAPP_SERVICE: projecta-web
+  WEBAPI_DIR: /mnt/data/api
+  WEBAPI_PORT: 5031
+  WEBAPI_SERVICE: projecta-api
 
 jobs:
   build-and-test:
-    name: Build
+    name: Build and test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,20 +53,21 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # No dedicated ProjectA.Web test project exists yet, so this is a
-      # build-only gate - it still catches compile errors before they ever
-      # reach the deploy job below. Add a `dotnet test` step here once a
-      # ProjectA.Web.Tests project exists.
-      - name: Build ProjectA.Web
-        run: dotnet build ProjectA.Web/ProjectA.Web.csproj -c Release
+      # `dotnet test` restores and builds ProjectA.Api.Tests and, via its
+      # ProjectReference, ProjectA.Api itself - one command covers both the
+      # build gate and the test gate. ProjectA.Api.Tests spins up a real
+      # PostgreSQL instance via Testcontainers, which needs a working Docker
+      # daemon - already present on GitHub-hosted ubuntu-latest runners.
+      - name: Build and test ProjectA.Api
+        run: dotnet test ProjectA.Api.Tests/ProjectA.Api.Tests.csproj -c Release
 
   deploy:
     name: Publish and deploy
     needs: build-and-test
     runs-on: ubuntu-latest
-    # Same environment as run-ansible-projecta-hosting.yml: required reviewers
-    # gate this the same way, since it also ends in root-privileged actions
-    # (systemctl restart) on the production server.
+    # Same environment as the other deploy/ansible workflows: required
+    # reviewers gate this the same way, since it also ends in root-privileged
+    # actions (systemctl restart) on the production server.
     environment: aws-ansible
     steps:
       - name: Checkout
@@ -79,9 +78,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publish ProjectA.Web (self-contained, linux-x64)
+      - name: Publish ProjectA.Api (self-contained, linux-x64)
         run: |
-          dotnet publish ProjectA.Web/ProjectA.Web.csproj \
+          dotnet publish ProjectA.Api/ProjectA.Api.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained true \
@@ -92,7 +91,7 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ANSIBLE_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: gha-webdeploy-${{ github.run_id }}
+          role-session-name: gha-apideploy-${{ github.run_id }}
 
       - name: Install session-manager-plugin
         run: |
@@ -147,38 +146,45 @@ jobs:
           cat "$RUNNER_TEMP/ssm-session.log"
           exit 1
 
-      - name: Sync published app to /mnt/data/web
+      - name: Sync published app to /mnt/data/api
         run: |
           rsync -avz --delete \
             -e "ssh -p ${LOCAL_TUNNEL_PORT} -i ${RUNNER_TEMP}/ec2_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             "$RUNNER_TEMP/publish/" \
-            "admin@127.0.0.1:${WEBAPP_DIR}/"
+            "admin@127.0.0.1:${WEBAPI_DIR}/"
 
-      - name: Restart the app service
+      - name: Restart the API service
         run: |
           ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             admin@127.0.0.1 \
-            "chmod +x ${WEBAPP_DIR}/ProjectA.Web && sudo systemctl restart ${WEBAPP_SERVICE}"
+            "chmod +x ${WEBAPI_DIR}/ProjectA.Api && sudo systemctl restart ${WEBAPI_SERVICE}"
 
       - name: Health check
         run: |
+          # ProjectA.Api has no dedicated health endpoint (it's commented out
+          # in Program.cs) and no route mapped at "/", so a plain GET / would
+          # 404 even when the app is perfectly healthy. This just confirms
+          # Kestrel is bound and answering HTTP at all - any status code
+          # (curl's "000" means it couldn't connect) counts as up.
           for i in $(seq 1 15); do
-            if ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
-                 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                 admin@127.0.0.1 \
-                 "curl -sf -o /dev/null http://127.0.0.1:${WEBAPP_PORT}/"; then
-              echo "App is responding on port ${WEBAPP_PORT}"
+            HTTP_CODE=$(ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
+              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              admin@127.0.0.1 \
+              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${WEBAPI_PORT}/" || echo "000")
+
+            if [ "$HTTP_CODE" != "000" ]; then
+              echo "API is responding on port ${WEBAPI_PORT} (HTTP $HTTP_CODE)"
               exit 0
             fi
             sleep 2
           done
 
-          echo "::error::App did not respond on port ${WEBAPP_PORT} after restart"
+          echo "::error::API did not respond on port ${WEBAPI_PORT} after restart"
           ssh -p "${LOCAL_TUNNEL_PORT}" -i "${RUNNER_TEMP}/ec2_key.pem" \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             admin@127.0.0.1 \
-            "sudo systemctl status ${WEBAPP_SERVICE} --no-pager; sudo journalctl -u ${WEBAPP_SERVICE} --no-pager -n 50" || true
+            "sudo systemctl status ${WEBAPI_SERVICE} --no-pager; sudo journalctl -u ${WEBAPI_SERVICE} --no-pager -n 50" || true
           exit 1
 
       - name: Close tunnel and clean up key material

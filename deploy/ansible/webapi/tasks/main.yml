@@ -1,0 +1,36 @@
+---
+
+- name: Deploy the projecta-api systemd unit
+  template:
+    src: projecta-api.service.j2
+    dest: /etc/systemd/system/projecta-api.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: webapi_unit
+  notify: restart projecta-api
+
+- name: Reload systemd if the unit file changed
+  systemd:
+    daemon_reload: yes
+  when: webapi_unit.changed
+
+# Same reasoning as the webapp role: safe to enable before the app has ever
+# been deployed, but only start it once the executable actually exists.
+# deploy-api-projecta.yml starts/restarts the service itself once it has
+# actually copied the app into place.
+- name: Check whether the API has been deployed yet
+  stat:
+    path: "{{ webapi_dir }}/{{ webapi_executable }}"
+  register: webapi_binary
+
+- name: Ensure the projecta-api service is enabled on boot
+  service:
+    name: projecta-api
+    enabled: yes
+
+- name: Start the projecta-api service if it has already been deployed
+  service:
+    name: projecta-api
+    state: started
+  when: webapi_binary.stat.exists
