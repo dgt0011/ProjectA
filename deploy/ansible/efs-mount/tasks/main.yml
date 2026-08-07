@@ -14,3 +14,17 @@
     fstype: nfs
     opts: rw,sync,hard
     state: mounted
+
+- name: create the /mnt/data/web directory
+  file: 
+    path: /mnt/data/web
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+
+- name: create the /mnt/data/api directory
+  file: 
+    path: /mnt/data/api
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"

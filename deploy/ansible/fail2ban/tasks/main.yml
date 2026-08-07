@@ -1,0 +1,19 @@
+---
+
+- name: Install fail2ban
+  apt:
+    name:
+      - fail2ban
+    state: latest
+    update_cache: yes
+    lock_timeout: 300
+
+- name: Enable the service
+  service:
+    name: fail2ban
+    enabled: yes
+
+- name: Start the service
+  service:
+    name: fail2ban
+    state: started

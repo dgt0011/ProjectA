@@ -20,4 +20,5 @@
       - build-essential
       - nfs-common
       - nfs4-acl-tools
+      - rsync
     state: latest
