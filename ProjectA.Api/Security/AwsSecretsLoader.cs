@@ -100,10 +100,7 @@ internal static class AwsSecretsLoader
             
             var retVal = connectionStringBuilder.ConnectionString;
             // this *really* shouldnt be necessary
-            retVal = retVal.Replace("Database=postgres;", "Database=postgresdb;");
-
-            retVal = "Host=postgresdb.cokzyie9kbxs.ap-southeast-2.rds.amazonaws.com;Port=5432;Database=postgresdb;Username=projecta_dbo;Password=b)#~VaO%hbmgfDl}}ascE$#!NBT678K0;GSS Encryption Mode=Disable;Pooling=true";
-            
+            //retVal = retVal.Replace("Database=postgres;", "Database=postgresdb;");
             return retVal;
         }
     }
