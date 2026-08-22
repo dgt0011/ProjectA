@@ -98,10 +98,7 @@ internal static class AwsSecretsLoader
                 GssEncryptionMode = GssEncryptionMode.Disable
             };
             
-            var retVal = connectionStringBuilder.ConnectionString;
-            // this *really* shouldnt be necessary
-            //retVal = retVal.Replace("Database=postgres;", "Database=postgresdb;");
-            return retVal;
+            return connectionStringBuilder.ConnectionString;
         }
     }
 
