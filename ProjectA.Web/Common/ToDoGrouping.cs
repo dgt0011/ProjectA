@@ -36,4 +36,22 @@ public static class ToDoGrouping
 
         return groups;
     }
+
+    // ToDo/Index's "Show Project related items" section: Project-associated ToDos grouped by
+    // Project (ordered alphabetically by Project title), each Project's own items then grouped
+    // the same Uncategorized-first/alphabetical-by-category way as GroupByCategory.
+    public sealed record ProjectToDoGroup(string ProjectTitle, List<ToDoGroup> CategoryGroups);
+
+    public static List<ProjectToDoGroup> GroupByProjectThenCategory(
+        IEnumerable<ToDoDto> todos,
+        IReadOnlyDictionary<long, string> categoryTitlesById,
+        IReadOnlyDictionary<long, string> projectTitlesById)
+    {
+        return todos
+            .Where(todo => todo.ProjectId is not null)
+            .GroupBy(todo => projectTitlesById.GetValueOrDefault(todo.ProjectId!.Value, $"#{todo.ProjectId}"))
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ProjectToDoGroup(group.Key, GroupByCategory(group, categoryTitlesById)))
+            .ToList();
+    }
 }
