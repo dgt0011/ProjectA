@@ -21,6 +21,15 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     private long _categoryId;
     private long _projectId;
 
+    // Ids of every ToDo SeedToDoAsync has inserted for this test instance - tracked explicitly
+    // because a test can update a seeded row's category_id and/or project_id away from the
+    // test category/project (e.g. Put_WithoutCategory_SetsCategoryToNull clears CategoryId).
+    // CleanUpAsync's category_id/project_id-scoped DELETE can no longer find such a row once
+    // that's happened, which would otherwise leak it permanently into the whole todos table -
+    // and GetToDoListEndpoint has no per-test scoping, so ToDoEndpointsTests' "total item
+    // count" assertions would then fail depending on test execution order.
+    private readonly List<long> _createdToDoIds = [];
+
     public UpdateToDoEndpointTests(ApiFactory factory)
     {
         _client = factory.CreateAuthenticatedClient();
@@ -45,6 +54,16 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     private async Task CleanUpAsync()
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
+
+        // Delete by id first - covers rows a test has updated to clear both category_id and
+        // project_id (see _createdToDoIds' own comment), which the column-scoped delete below
+        // can no longer find.
+        if (_createdToDoIds.Count > 0)
+        {
+            await connection.ExecuteAsync("DELETE FROM todos WHERE id IN @Ids;", new { Ids = _createdToDoIds });
+            _createdToDoIds.Clear();
+        }
+
         await connection.ExecuteAsync(
             "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title = @CategoryTitle) " +
             "OR project_id IN (SELECT id FROM projects WHERE title = @ProjectTitle);",
@@ -56,11 +75,13 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     private async Task<long> SeedToDoAsync(bool actioned = false)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
-        return await connection.QuerySingleAsync<long>(
+        var id = await connection.QuerySingleAsync<long>(
             "INSERT INTO todos (title, actioned, category_id, description, date_created) " +
             "VALUES ('Original Title', @Actioned, @CategoryId, 'Original description', now()) " +
             "RETURNING id;",
             new { Actioned = actioned, CategoryId = _categoryId });
+        _createdToDoIds.Add(id);
+        return id;
     }
 
     [Fact]
