@@ -4,6 +4,9 @@ server {
 
     server_name {{ nginx_server_name }};
 
+    # permit large file uploads for this site
+    client_max_body_size 100M;
+
     # This is the bootstrap, HTTP-only vhost. Once the letsencrypt role has
     # obtained a certificate it overwrites this same file with an
     # HTTPS-enabled version (see deploy/ansible/letsencrypt/templates/vhost-ssl.conf.j2).
