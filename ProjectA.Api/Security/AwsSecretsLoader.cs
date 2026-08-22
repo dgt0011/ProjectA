@@ -94,17 +94,11 @@ internal static class AwsSecretsLoader
                 Port = RequirePort(root, secretName),
                 Database = RequireString(root, "dbname", secretName),
                 Username = RequireString(root, "username", secretName),
-                Password = RequireString(root, "password", secretName)
+                Password = RequireString(root, "password", secretName),
+                GssEncryptionMode = GssEncryptionMode.Disable
             };
-
-            connectionStringBuilder.Database = "postgresdb";
-
-            // Matches every other connection string already in this app (appsettings.json,
-            // appsettings.Development.json, ProjectA.Api.Tests/ApiFactory.cs): without this,
-            // Npgsql attempts a GSS/Kerberos handshake first and fails with
-            // "libgssapi_krb5.so.2: cannot open shared object file" on hosts that don't have
-            // that library installed.
-            return $"{connectionStringBuilder.ConnectionString};GSS Encryption Mode=Disable";
+            
+            return connectionStringBuilder.ConnectionString;
         }
     }
 

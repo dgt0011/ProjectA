@@ -8,7 +8,7 @@
     <h1>Projects</h1>
     @if (User.Identity?.IsAuthenticated == true)
     {
-        <a asp-page="Create" class="btn btn-primary">Create project</a>
+        <a asp-page="/Projects/Create" class="btn btn-primary">Create project</a>
     }
 </div>
 
@@ -46,46 +46,3 @@ else
         }
     </div>
 }
-
-
-<!--
-
-<div class="row g-4">
-    <div class="col-sm-6 col-lg-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Bookmarks</h5>
-                <p class="card-text text-muted">Save links, rate them and tag them with categories.</p>
-                <a asp-page="/Bookmarks/Index" class="btn btn-primary">Manage bookmarks</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Attachments</h5>
-                <p class="card-text text-muted">Track files stored in S3 by ARN.</p>
-                <a asp-page="/Attachments/Index" class="btn btn-primary">Manage attachments</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Notes</h5>
-                <p class="card-text text-muted">Write notes with a Markdown editor and live preview.</p>
-                <a asp-page="/Notes/Index" class="btn btn-primary">Manage notes</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Projects</h5>
-                <p class="card-text text-muted">Track projects and their start dates.</p>
-                <a asp-page="/Projects/Index" class="btn btn-primary">Manage projects</a>
-            </div>
-        </div>
-    </div>
-</div>
--->
