@@ -12,7 +12,7 @@ public static class CreateToDoEndpoint
         group.MapPost("", Handle)
             .WithName("CreateToDo")
             .WithSummary("Create a ToDo")
-            .WithDescription("Creates a new outstanding ToDo item, associated with exactly one category.")
+            .WithDescription("Creates a new outstanding ToDo item, optionally associated with a category and/or a project.")
             .RequireAuthorization();
     }
 
@@ -71,11 +71,8 @@ public static class CreateToDoEndpoint
             errors[nameof(request.Title)] = ["Title is required."];
         }
 
-        if (request.CategoryId is null)
-        {
-            errors[nameof(request.CategoryId)] = ["CategoryId is required."];
-        }
-
+        // CategoryId is optional - a ToDo with none is grouped as "Uncategorized" wherever
+        // ToDo lists are displayed, rather than being rejected here.
         return errors;
     }
 

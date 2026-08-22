@@ -28,48 +28,43 @@ else if (Model.ToDoItems.Count == 0)
 }
 else
 {
-    <table class="table table-striped align-middle">
-        <thead>
-            <tr>
-                <th>Done</th>
-                <th>Title</th>
-                <th>Category</th>
-                <th>Description</th>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <th class="text-end">Actions</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in Model.ToDoItems)
-            {
-                <tr class="@(item.Done ? "text-decoration-line-through text-muted" : "")">
-                    <td>@(item.Done ? "Yes" : "No")</td>
-                    <td>@item.Title</td>
-                    <td>
-                        @if (item.CategoryId is not null)
-                        {
-                            <span class="badge bg-secondary">@Model.CategoryTitle(item.CategoryId)</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted">-</span>
-                        }
-                    </td>
-                    <td>@item.Description</td>
+    @* Uncategorized items list first (their own group, if any), then each category's items -
+       see IndexModel.GroupedToDoItems / ToDoGrouping. *@
+    foreach (var group in Model.GroupedToDoItems)
+    {
+        <h2 class="h5 mt-4">@(group.IsUncategorized ? "Uncategorized" : group.CategoryTitle)</h2>
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Done</th>
+                    <th>Title</th>
+                    <th>Description</th>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <td class="text-end">
-                            <a asp-page="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id" class="d-inline"
-                                  onsubmit="return confirm('Delete this ToDo item?');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                            </form>
-                        </td>
+                        <th class="text-end">Actions</th>
                     }
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var item in group.Items)
+                {
+                    <tr class="@(item.Done ? "text-decoration-line-through text-muted" : "")">
+                        <td>@(item.Done ? "Yes" : "No")</td>
+                        <td>@item.Title</td>
+                        <td>@item.Description</td>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <td class="text-end">
+                                <a asp-page="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id" class="d-inline"
+                                      onsubmit="return confirm('Delete this ToDo item?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 }

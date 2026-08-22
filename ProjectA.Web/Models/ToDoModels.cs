@@ -18,16 +18,16 @@ public sealed class ToDoDto
 // Bound by the Create page - CreateToDoRequest has no Done flag (new items always start
 // outstanding). Also reused as-is by Projects/Details.cshtml.cs's "Create ToDo" modal (same
 // Title/CategoryId/Description fields), which sets ProjectId itself from the route before
-// calling IToDoApiClient.CreateAsync - CategoryId stays required there too, matching this
-// page's own invariant rather than introducing a second, looser way to create a ToDo.
+// calling IToDoApiClient.CreateAsync.
 public sealed class ToDoCreateInput
 {
     [Required(ErrorMessage = "Title is required.")]
     [StringLength(255)]
     public string Title { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Category is required.")]
-    [Display(Name = "Category")]
+    // Optional - a ToDo left without a category is grouped as "Uncategorized" wherever ToDo
+    // lists are displayed (ahead of the categorized groups), rather than being required here.
+    [Display(Name = "Category (optional)")]
     public long? CategoryId { get; set; }
 
     public string? Description { get; set; }
@@ -42,8 +42,8 @@ public sealed class ToDoEditInput
     [StringLength(255)]
     public string Title { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Category is required.")]
-    [Display(Name = "Category")]
+    // Optional - see ToDoCreateInput.CategoryId.
+    [Display(Name = "Category (optional)")]
     public long? CategoryId { get; set; }
 
     public string? Description { get; set; }

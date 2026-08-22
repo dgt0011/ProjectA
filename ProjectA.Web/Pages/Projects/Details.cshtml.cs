@@ -57,6 +57,10 @@ public class DetailsModel(
     // standalone ToDo Index page's includeDone checkbox).
     public List<ToDoDto> ProjectToDos { get; set; } = [];
 
+    // Uncategorized items first (as their own group), then categorized items grouped by
+    // category title - see ToDoGrouping. Built from ProjectToDos once categories are loaded.
+    public List<ToDoGrouping.ToDoGroup> GroupedProjectToDos { get; set; } = [];
+
     // For the "Create ToDo" modal's category dropdown - same field, same requirement, as the
     // standalone ToDo Create page, just reached without leaving this page.
     public List<CategoryDto> AvailableCategories { get; set; } = [];
@@ -233,6 +237,9 @@ public class DetailsModel(
         {
             AvailableCategories = categoriesResult.Value ?? [];
         }
+
+        var categoryTitlesById = AvailableCategories.ToDictionary(category => category.Id, category => category.Title);
+        GroupedProjectToDos = ToDoGrouping.GroupByCategory(ProjectToDos, categoryTitlesById);
 
         return Page();
     }

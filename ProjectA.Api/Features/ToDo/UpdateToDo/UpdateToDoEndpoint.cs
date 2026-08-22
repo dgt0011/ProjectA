@@ -91,11 +91,8 @@ public static class UpdateToDoEndpoint
             errors[nameof(request.Title)] = ["Title is required."];
         }
 
-        if (request.CategoryId is null)
-        {
-            errors[nameof(request.CategoryId)] = ["CategoryId is required."];
-        }
-
+        // CategoryId is optional - a ToDo with none is grouped as "Uncategorized" wherever
+        // ToDo lists are displayed, rather than being rejected here.
         return errors;
     }
 

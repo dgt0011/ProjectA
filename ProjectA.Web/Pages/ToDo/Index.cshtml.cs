@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using ProjectA.Web.Common;
 using ProjectA.Web.Models;
 using ProjectA.Web.Services;
 
@@ -13,12 +14,9 @@ public class IndexModel(IToDoApiClient toDoApiClient, ICategoriesApiClient categ
     public List<ToDoDto> ToDoItems { get; set; } = [];
     public bool LoadedSuccessfully { get; set; } = true;
 
-    private Dictionary<long, string> _categoryTitlesById = [];
-
-    public string CategoryTitle(long? categoryId) =>
-        categoryId is null
-            ? "-"
-            : _categoryTitlesById.GetValueOrDefault(categoryId.Value, $"#{categoryId}");
+    // Uncategorized items first (as their own group), then categorized items grouped by
+    // category title - see ToDoGrouping.
+    public List<ToDoGrouping.ToDoGroup> GroupedToDoItems { get; set; } = [];
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -36,11 +34,14 @@ public class IndexModel(IToDoApiClient toDoApiClient, ICategoriesApiClient categ
             LoadedSuccessfully = false;
         }
 
+        var categoryTitlesById = new Dictionary<long, string>();
         var categoriesResult = await categoriesTask;
         if (categoriesResult.IsSuccess)
         {
-            _categoryTitlesById = (categoriesResult.Value ?? []).ToDictionary(category => category.Id, category => category.Title);
+            categoryTitlesById = (categoriesResult.Value ?? []).ToDictionary(category => category.Id, category => category.Title);
         }
+
+        GroupedToDoItems = ToDoGrouping.GroupByCategory(ToDoItems, categoryTitlesById);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(long id, CancellationToken cancellationToken)

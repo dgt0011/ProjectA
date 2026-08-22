@@ -72,42 +72,47 @@ else
         else
         {
             @* Both outstanding and completed items shown together by default (outstanding
-               first) - a completed item's own completion notes render as Markdown directly
-               under its title. *@
-            foreach (var todo in Model.ProjectToDos)
+               first within each group) - a completed item's own completion notes render as
+               Markdown directly under its title. Uncategorized items are their own group,
+               listed before the categorized groups - see GroupedProjectToDos. *@
+            foreach (var group in Model.GroupedProjectToDos)
             {
-                <div class="card mb-2">
-                    <div class="card-body py-2">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="me-3">
-                                <h6 class="mb-1 @(todo.Done ? "text-decoration-line-through text-muted" : "")">@todo.Title</h6>
-                                @if (todo.Done && !string.IsNullOrWhiteSpace(todo.CompletionNotes))
-                                {
-                                    <textarea class="d-none todo-notes-raw" data-todo-id="@todo.Id">@todo.CompletionNotes</textarea>
-                                    <div class="todo-notes-rendered small text-muted mb-2" data-todo-id="@todo.Id"></div>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(todo.Description))
-                                {
-                                    <p class="mb-0 small">@todo.Description</p>
-                                }
-                            </div>
-                            <div class="text-end text-nowrap">
-                                @if (todo.Done)
-                                {
-                                    <span class="badge text-bg-success">Done</span>
-                                }
-                                else if (User.Identity?.IsAuthenticated == true)
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="modal" data-bs-target="#completeTodoModal"
-                                            data-todo-id="@todo.Id" data-todo-title="@todo.Title">
-                                        Complete
-                                    </button>
-                                }
+                <h3 class="h6 text-muted mt-3">@(group.IsUncategorized ? "Uncategorized" : group.CategoryTitle)</h3>
+                foreach (var todo in group.Items)
+                {
+                    <div class="card mb-2">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="me-3">
+                                    <h6 class="mb-1 @(todo.Done ? "text-decoration-line-through text-muted" : "")">@todo.Title</h6>
+                                    @if (todo.Done && !string.IsNullOrWhiteSpace(todo.CompletionNotes))
+                                    {
+                                        <textarea class="d-none todo-notes-raw" data-todo-id="@todo.Id">@todo.CompletionNotes</textarea>
+                                        <div class="todo-notes-rendered small text-muted mb-2" data-todo-id="@todo.Id"></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(todo.Description))
+                                    {
+                                        <p class="mb-0 small">@todo.Description</p>
+                                    }
+                                </div>
+                                <div class="text-end text-nowrap">
+                                    @if (todo.Done)
+                                    {
+                                        <span class="badge text-bg-success">Done</span>
+                                    }
+                                    else if (User.Identity?.IsAuthenticated == true)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal" data-bs-target="#completeTodoModal"
+                                                data-todo-id="@todo.Id" data-todo-title="@todo.Title">
+                                            Complete
+                                        </button>
+                                    }
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                }
             }
         }
     </div>

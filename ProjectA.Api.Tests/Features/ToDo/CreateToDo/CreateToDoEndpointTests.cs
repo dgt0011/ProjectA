@@ -14,6 +14,7 @@ public class CreateToDoEndpointTests : IAsyncLifetime
 {
     private const string TestCategoryTitle = "Create Test Category";
     private const string TestProjectTitle = "Create Test Project";
+    private const string UncategorizedToDoTitle = "Create Test Uncategorized ToDo";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
@@ -47,8 +48,9 @@ public class CreateToDoEndpointTests : IAsyncLifetime
         using var connection = await _connectionFactory.CreateConnectionAsync();
         await connection.ExecuteAsync(
             "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title = @CategoryTitle) " +
-            "OR project_id IN (SELECT id FROM projects WHERE title = @ProjectTitle);",
-            new { CategoryTitle = TestCategoryTitle, ProjectTitle = TestProjectTitle });
+            "OR project_id IN (SELECT id FROM projects WHERE title = @ProjectTitle) " +
+            "OR title = @UncategorizedToDoTitle;",
+            new { CategoryTitle = TestCategoryTitle, ProjectTitle = TestProjectTitle, UncategorizedToDoTitle });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title = @Title;", new { Title = TestCategoryTitle });
         await connection.ExecuteAsync("DELETE FROM projects WHERE title = @Title;", new { Title = TestProjectTitle });
     }
@@ -90,17 +92,20 @@ public class CreateToDoEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Post_WithMissingCategory_ReturnsValidationProblem()
+    public async Task Post_WithoutCategory_CreatesToDoWithNullCategory()
     {
-        var request = new CreateToDoEndpoint.CreateToDoRequest("A title", null, null);
+        // CategoryId is optional - a ToDo without one is grouped as "Uncategorized" wherever
+        // ToDo lists are displayed, rather than being rejected.
+        var request = new CreateToDoEndpoint.CreateToDoRequest(UncategorizedToDoTitle, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/todo", request, JsonOptions);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
-        Assert.NotNull(problem);
-        Assert.True(problem.Errors.ContainsKey("CategoryId"));
+        var created = await response.Content.ReadFromJsonAsync<CreateToDoEndpoint.ToDoResponse>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.Null(created.CategoryId);
+        Assert.Equal(UncategorizedToDoTitle, created.Title);
     }
 
     [Fact]

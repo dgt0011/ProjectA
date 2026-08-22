@@ -106,6 +106,23 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Put_WithoutCategory_SetsCategoryToNull()
+    {
+        // CategoryId is optional on update too - clearing it moves the ToDo into the
+        // "Uncategorized" group wherever ToDo lists are displayed, rather than being rejected.
+        var id = await SeedToDoAsync();
+        var request = new UpdateToDoEndpoint.UpdateToDoRequest("Original Title", null, "Original description", false);
+
+        var response = await _client.PutAsJsonAsync($"/api/todo/{id}", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<UpdateToDoEndpoint.ToDoResponse>(JsonOptions);
+        Assert.NotNull(updated);
+        Assert.Null(updated.CategoryId);
+    }
+
+    [Fact]
     public async Task Put_WithCategoryIdThatDoesNotExist_ReturnsValidationProblem()
     {
         var id = await SeedToDoAsync();
