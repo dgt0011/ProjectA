@@ -58,9 +58,16 @@ public class UpdateToDoEndpointTests : IAsyncLifetime
         // Delete by id first - covers rows a test has updated to clear both category_id and
         // project_id (see _createdToDoIds' own comment), which the column-scoped delete below
         // can no longer find.
+        //
+        // Uses "= ANY(@Ids)" rather than Dapper's usual "IN @Ids" magic-string list expansion -
+        // Npgsql binds the array parameter itself (long[] -> bigint[]) natively, which is what
+        // actually reached the server here; Dapper's textual expansion of "IN @Ids" into
+        // "IN (@Ids1,@Ids2,...)" didn't happen (observed as a bare "IN $1" - no parens -
+        // reaching Postgres, i.e. a single unwrapped array parameter, which Postgres's IN syntax
+        // rejects). ANY(...) accepts that same array parameter directly, so it's valid either way.
         if (_createdToDoIds.Count > 0)
         {
-            await connection.ExecuteAsync("DELETE FROM todos WHERE id IN @Ids;", new { Ids = _createdToDoIds });
+            await connection.ExecuteAsync("DELETE FROM todos WHERE id = ANY(@Ids);", new { Ids = _createdToDoIds.ToArray() });
             _createdToDoIds.Clear();
         }
 
