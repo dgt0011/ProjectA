@@ -3,7 +3,6 @@ server {
        listen [::]:80;
 
        server_name projects.darrentuer.net;
-       client_max_body_size 100M;
 
        root /mnt/data/web;
 
