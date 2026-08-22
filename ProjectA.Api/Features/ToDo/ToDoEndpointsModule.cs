@@ -1,3 +1,4 @@
+using ProjectA.Api.Features.ToDo.CompleteToDo;
 using ProjectA.Api.Features.ToDo.CreateToDo;
 using ProjectA.Api.Features.ToDo.DeleteToDo;
 using ProjectA.Api.Features.ToDo.GetToDoById;
@@ -17,6 +18,7 @@ public static class ToDoEndpointsModule
         group.MapGetToDoById();
         group.MapCreateToDo();
         group.MapUpdateToDo();
+        group.MapCompleteToDo();
         group.MapDeleteToDo();
     }
 }

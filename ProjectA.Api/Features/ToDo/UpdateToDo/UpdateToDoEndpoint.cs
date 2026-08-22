@@ -47,6 +47,7 @@ public static class UpdateToDoEndpoint
 
         entity.title = request.Title;
         entity.category_id = request.CategoryId;
+        entity.project_id = request.ProjectId;
         entity.description = request.Description;
         entity.actioned = request.Done;
         entity.date_modified = DateTime.UtcNow;
@@ -58,10 +59,7 @@ public static class UpdateToDoEndpoint
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [nameof(request.CategoryId)] = ["CategoryId does not refer to an existing category."]
-            });
+            return TypedResults.ValidationProblem(BuildForeignKeyViolationError(ex, request));
         }
 
         if (!updated)
@@ -73,8 +71,10 @@ public static class UpdateToDoEndpoint
         var response = new ToDoResponse(
             entity.id,
             entity.category_id,
+            entity.project_id,
             entity.title,
             entity.description,
+            entity.completion_notes,
             entity.date_created,
             entity.date_modified,
             entity.actioned);
@@ -91,23 +91,36 @@ public static class UpdateToDoEndpoint
             errors[nameof(request.Title)] = ["Title is required."];
         }
 
-        if (request.CategoryId is null)
-        {
-            errors[nameof(request.CategoryId)] = ["CategoryId is required."];
-        }
-
+        // CategoryId is optional - a ToDo with none is grouped as "Uncategorized" wherever
+        // ToDo lists are displayed, rather than being rejected here.
         return errors;
     }
 
-    // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record UpdateToDoRequest(string Title, long? CategoryId, string? Description, bool Done);
+    // Same reasoning as CreateToDoEndpoint's equivalent helper - the constraint name is what
+    // tells us whether CategoryId or ProjectId actually failed to resolve.
+    private static Dictionary<string, string[]> BuildForeignKeyViolationError(PostgresException ex, UpdateToDoRequest request) =>
+        ex.ConstraintName?.Contains("project_id") == true
+            ? new Dictionary<string, string[]>
+            {
+                [nameof(request.ProjectId)] = ["ProjectId does not refer to an existing project."]
+            }
+            : new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryId)] = ["CategoryId does not refer to an existing category."]
+            };
+
+    // Request body accepted by this endpoint - owned by this slice, not shared. ProjectId
+    // defaults to null so existing positional-argument call sites keep compiling unchanged.
+    public sealed record UpdateToDoRequest(string Title, long? CategoryId, string? Description, bool Done, long? ProjectId = null);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record ToDoResponse(
         long Id,
         long? CategoryId,
+        long? ProjectId,
         string Title,
         string? Description,
+        string? CompletionNotes,
         DateTime? DateCreated,
         DateTime? DateModified,
         bool Done);

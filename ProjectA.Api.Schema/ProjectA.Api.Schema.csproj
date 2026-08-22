@@ -37,6 +37,8 @@
       <EmbeddedResource Include="Scripts\script011-AlterTable-Attachments-Rename-S3Arn-To-FilePath.sql" />
       <None Remove="Scripts\script012-CreateTable-AttachmentTypes.sql" />
       <EmbeddedResource Include="Scripts\script012-CreateTable-AttachmentTypes.sql" />
+      <None Remove="Scripts\script013-AlterTable-Todos-Add-CompletionNotes.sql" />
+      <EmbeddedResource Include="Scripts\script013-AlterTable-Todos-Add-CompletionNotes.sql" />
     </ItemGroup>
 
 </Project>

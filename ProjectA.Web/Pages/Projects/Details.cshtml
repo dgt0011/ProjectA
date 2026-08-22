@@ -55,6 +55,152 @@ else
         }
     </div>
 
+    <div class="mt-4 project-item-container">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5">Things To Do</h2>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTodoModal">
+                    Create
+                </button>
+            }
+        </div>
+        @if (Model.ProjectToDos.Count == 0)
+        {
+            <p class="text-muted">No ToDo items for this project yet.</p>
+        }
+        else
+        {
+            @* Both outstanding and completed items shown together by default (outstanding
+               first within each group) - a completed item's own completion notes render as
+               Markdown directly under its title. Uncategorized items are their own group,
+               listed before the categorized groups - see GroupedProjectToDos. *@
+            foreach (var group in Model.GroupedProjectToDos)
+            {
+                <h3 class="h6 text-muted mt-3">@(group.IsUncategorized ? "" : group.CategoryTitle)</h3>
+                foreach (var todo in group.Items)
+                {
+                    <div class="card mb-2">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="me-3">
+                                    <h6 class="mb-1 @(todo.Done ? "text-decoration-line-through text-muted" : "")">@todo.Title</h6>
+                                    @if (todo.Done && !string.IsNullOrWhiteSpace(todo.CompletionNotes))
+                                    {
+                                        <textarea class="d-none todo-notes-raw" data-todo-id="@todo.Id">@todo.CompletionNotes</textarea>
+                                        <div class="todo-notes-rendered small text-muted mb-2" data-todo-id="@todo.Id"></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(todo.Description))
+                                    {
+                                        <p class="mb-0 small">@todo.Description</p>
+                                    }
+                                </div>
+                                <div class="text-end text-nowrap">
+                                    @if (todo.Done)
+                                    {
+                                        <span class="badge text-bg-success">Done</span>
+                                    }
+                                    else if (User.Identity?.IsAuthenticated == true)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal" data-bs-target="#completeTodoModal"
+                                                data-todo-id="@todo.Id" data-todo-title="@todo.Title">
+                                            Complete
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </div>
+
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        @if (Model.ShowCreateTodoModal)
+        {
+            @* Marker only - read by _ProjectTodoScripts to reopen this modal after a failed
+               submit round-trips back here, so the validation messages inside it are visible
+               instead of the modal just silently having closed. *@
+            <div id="reopen-create-todo-modal" class="d-none"></div>
+        }
+        <div class="modal fade" id="createTodoModal" tabindex="-1" aria-labelledby="createTodoModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="post" asp-page-handler="CreateTodo">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="createTodoModalLabel">New ToDo</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                            <div class="mb-3">
+                                <label asp-for="CreateTodoForm.Title" class="form-label"></label>
+                                <input asp-for="CreateTodoForm.Title" class="form-control" />
+                                <span asp-validation-for="CreateTodoForm.Title" class="text-danger"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="CreateTodoForm.CategoryId" class="form-label"></label>
+                                @if (Model.AvailableCategories.Count == 0)
+                                {
+                                    <p class="text-muted">No categories exist yet.</p>
+                                }
+                                else
+                                {
+                                    <select asp-for="CreateTodoForm.CategoryId" class="form-select">
+                                        <option value="">Select a category...</option>
+                                        @foreach (var category in Model.AvailableCategories)
+                                        {
+                                            <option value="@category.Id">@category.Title</option>
+                                        }
+                                    </select>
+                                }
+                                <span asp-validation-for="CreateTodoForm.CategoryId" class="text-danger"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="CreateTodoForm.Description" class="form-label"></label>
+                                <textarea asp-for="CreateTodoForm.Description" class="form-control" rows="3"></textarea>
+                                <span asp-validation-for="CreateTodoForm.Description" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        @* One shared modal for every ToDo's "Complete" button - _ProjectTodoScripts populates
+           the hidden TodoId field and the title placeholder from whichever button triggered it,
+           rather than rendering a separate modal (and a separate Markdown-notes textarea) per
+           ToDo. *@
+        <div class="modal fade" id="completeTodoModal" tabindex="-1" aria-labelledby="completeTodoModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="post" asp-page-handler="CompleteTodo">
+                        <input type="hidden" name="todoId" id="completeTodoId" value="" />
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="completeTodoModalLabel">Complete "<span id="completeTodoTitle"></span>"</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label asp-for="CompleteTodoForm.Notes" class="form-label">Completion notes (optional - Markdown supported)</label>
+                            <textarea asp-for="CompleteTodoForm.Notes" id="CompleteTodoForm_Notes" class="form-control" rows="6"></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (Model.AssociatedBookmarks.Count > 0)
     {
         <div class="mt-4">
@@ -102,4 +248,5 @@ else
 
 @section Scripts {
     <partial name="_ProjectNoteScripts" />
+    <partial name="_ProjectTodoScripts" />
 }

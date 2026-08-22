@@ -7,15 +7,20 @@ using ProjectA.Web.Services;
 namespace ProjectA.Web.Pages.Projects;
 
 // Deliberately not [Authorize] - anyone can view a project's full content (matching
-// GetProjectByIdEndpoint, which is anonymous on the API side too). Only the Edit link shown
-// on the page is gated on the viewer being signed in.
+// GetProjectByIdEndpoint, which is anonymous on the API side too). Only the Edit link, the
+// "Create note"/"Create ToDo" buttons, and the ToDo "Complete" button are gated on the viewer
+// being signed in - each of the new POST handlers below checks that itself (Challenge() if not),
+// the same per-handler pattern ToDo/Index.cshtml.cs's OnPostDeleteAsync already uses, since the
+// whole PageModel can't be [Authorize] without breaking anonymous viewing.
 public class DetailsModel(
     IProjectsApiClient projectsApiClient,
     INotesApiClient notesApiClient,
     IBookmarksApiClient bookmarksApiClient,
     IAttachmentsApiClient attachmentsApiClient,
     IBookmarkTypesApiClient bookmarkTypesApiClient,
-    IAttachmentTypesApiClient attachmentTypesApiClient) : PageModel
+    IAttachmentTypesApiClient attachmentTypesApiClient,
+    IToDoApiClient toDoApiClient,
+    ICategoriesApiClient categoriesApiClient) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -44,7 +49,91 @@ public class DetailsModel(
     // in original context, one at a time, without leaving the page.
     public List<ProjectNoteItemViewModel> AssociatedNoteItems { get; set; } = [];
 
-    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    // ToDos associated with this project - unlike Notes/Bookmarks/Attachments, todos.project_id
+    // is a plain nullable FK column (one-to-many from the project's side, not a join table), so
+    // this is a direct filtered list call rather than an id-lookup. Outstanding items first,
+    // then completed, each group oldest-first - both shown together by default per this
+    // section's display requirement (there's no hide-completed toggle here, unlike the
+    // standalone ToDo Index page's includeDone checkbox).
+    public List<ToDoDto> ProjectToDos { get; set; } = [];
+
+    // Uncategorized items first (as their own group), then categorized items grouped by
+    // category title - see ToDoGrouping. Built from ProjectToDos once categories are loaded.
+    public List<ToDoGrouping.ToDoGroup> GroupedProjectToDos { get; set; } = [];
+
+    // For the "Create ToDo" modal's category dropdown - same field, same requirement, as the
+    // standalone ToDo Create page, just reached without leaving this page.
+    public List<CategoryDto> AvailableCategories { get; set; } = [];
+
+    [BindProperty]
+    public ToDoCreateInput CreateTodoForm { get; set; } = new();
+
+    [BindProperty]
+    public ToDoCompleteInput CompleteTodoForm { get; set; } = new();
+
+    // Set on a failed Create-ToDo submit so the page can re-open that modal (rather than just
+    // silently closing it) with its validation messages visible - see reopen-create-todo-modal
+    // in Details.cshtml/_ProjectTodoScripts.
+    public bool ShowCreateTodoModal { get; set; }
+
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken) => await LoadAsync(cancellationToken);
+
+    public async Task<IActionResult> OnPostCreateTodoAsync(CancellationToken cancellationToken)
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return Challenge();
+        }
+
+        // The modal doesn't expose a Project picker - this page's own Id is the only project a
+        // ToDo created here can ever be associated with.
+        CreateTodoForm.ProjectId = Id;
+
+        if (!ModelState.IsValid)
+        {
+            var invalidResult = await LoadAsync(cancellationToken);
+            ShowCreateTodoModal = true;
+            return invalidResult;
+        }
+
+        var result = await toDoApiClient.CreateAsync(CreateTodoForm, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            ModelState.AddApiErrors(result.Errors, prefix: "CreateTodoForm");
+            if (result.Errors is null)
+            {
+                ModelState.AddModelError(string.Empty, result.ToDisplayMessage("Could not create the ToDo item."));
+            }
+
+            var failureResult = await LoadAsync(cancellationToken);
+            ShowCreateTodoModal = true;
+            return failureResult;
+        }
+
+        TempData["SuccessMessage"] = "ToDo item created.";
+        return RedirectToPage(new { Id });
+    }
+
+    public async Task<IActionResult> OnPostCompleteTodoAsync(long todoId, CancellationToken cancellationToken)
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return Challenge();
+        }
+
+        var result = await toDoApiClient.CompleteAsync(todoId, CompleteTodoForm, cancellationToken);
+
+        TempData[result.IsSuccess ? "SuccessMessage" : "ErrorMessage"] = result.IsSuccess
+            ? "ToDo item completed."
+            : result.ToDisplayMessage("Could not complete the ToDo item.");
+
+        // Always redirect (rather than redisplaying the modal on failure) - the only field in
+        // this modal is free-text notes, so there's no ModelState validation failure to show;
+        // an API-level failure just surfaces as the error banner on the reloaded page.
+        return RedirectToPage(new { Id });
+    }
+
+    private async Task<IActionResult> LoadAsync(CancellationToken cancellationToken)
     {
         var result = await projectsApiClient.GetByIdAsync(Id, cancellationToken);
         if (!result.IsSuccess || result.Value is null)
@@ -129,6 +218,28 @@ public class DetailsModel(
                 AttachmentTypesById = _attachmentTypesById
             })
             .ToList();
+
+        var todosTask = toDoApiClient.GetListAsync(includeDone: true, projectId: Id, cancellationToken: cancellationToken);
+        var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
+        await Task.WhenAll(todosTask, categoriesTask);
+
+        var todosResult = await todosTask;
+        if (todosResult.IsSuccess)
+        {
+            ProjectToDos = (todosResult.Value ?? [])
+                .OrderBy(todo => todo.Done)
+                .ThenBy(todo => todo.DateCreated)
+                .ToList();
+        }
+
+        var categoriesResult = await categoriesTask;
+        if (categoriesResult.IsSuccess)
+        {
+            AvailableCategories = categoriesResult.Value ?? [];
+        }
+
+        var categoryTitlesById = AvailableCategories.ToDictionary(category => category.Id, category => category.Title);
+        GroupedProjectToDos = ToDoGrouping.GroupByCategory(ProjectToDos, categoryTitlesById);
 
         return Page();
     }
