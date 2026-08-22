@@ -48,7 +48,7 @@ public class CreateModel(
         }
 
         TempData["SuccessMessage"] = "Project created.";
-        return RedirectToPage("Index");
+        return RedirectToPage("~/Index");
     }
 
     private async Task LoadAssociationOptionsAsync(CancellationToken cancellationToken)
