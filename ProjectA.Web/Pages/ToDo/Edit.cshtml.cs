@@ -32,7 +32,13 @@ public class EditModel(IToDoApiClient toDoApiClient, ICategoriesApiClient catego
             Title = result.Value.Title,
             CategoryId = result.Value.CategoryId,
             Description = result.Value.Description,
-            Done = result.Value.Done
+            Done = result.Value.Done,
+            // Not shown as an editable field on this page (project association is managed
+            // from the Project Details page's own Create/Complete modals) - carried through
+            // as a hidden field purely so saving here doesn't wipe an existing association.
+            // UpdateToDoRequest is full-replace, not a partial patch, same as CategoryId/
+            // Description always have been.
+            ProjectId = result.Value.ProjectId
         };
 
         await LoadCategoriesAsync(cancellationToken);

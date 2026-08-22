@@ -1,0 +1,59 @@
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Render each completed ToDo's raw completion notes (sitting untouched in its own
+        // hidden .todo-notes-raw textarea, matched to its .todo-notes-rendered container by a
+        // shared data-todo-id) the same safe way Notes' body is rendered elsewhere on this page:
+        // marked.parse() followed by DOMPurify.sanitize() before ever touching innerHTML.
+        if (typeof marked !== 'undefined') {
+            document.querySelectorAll('.todo-notes-raw').forEach(function (rawTextarea) {
+                var todoId = rawTextarea.getAttribute('data-todo-id');
+                var rendered = document.querySelector('.todo-notes-rendered[data-todo-id="' + todoId + '"]');
+                if (!rendered) {
+                    return;
+                }
+
+                var html = marked.parse(rawTextarea.value || '');
+                if (typeof DOMPurify !== 'undefined') {
+                    html = DOMPurify.sanitize(html);
+                }
+
+                rendered.innerHTML = html;
+            });
+        }
+
+        // One shared "Complete" modal serves every ToDo card - populate it with whichever
+        // ToDo's button triggered it, and clear it again once closed so the next ToDo it's
+        // opened for doesn't inherit stale notes text.
+        var completeModal = document.getElementById('completeTodoModal');
+        if (completeModal) {
+            completeModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                document.getElementById('completeTodoId').value = button.getAttribute('data-todo-id') || '';
+                document.getElementById('completeTodoTitle').textContent = button.getAttribute('data-todo-title') || '';
+            });
+
+            completeModal.addEventListener('hidden.bs.modal', function () {
+                var notesField = document.getElementById('CompleteTodoForm_Notes');
+                if (notesField) {
+                    notesField.value = '';
+                }
+            });
+        }
+
+        // After a failed "Create ToDo" submit round-trips back to this page, reopen that modal
+        // so its validation messages (rendered server-side, inside the modal body) are actually
+        // visible instead of the modal just having silently closed.
+        if (document.getElementById('reopen-create-todo-modal')) {
+            var createModalEl = document.getElementById('createTodoModal');
+            if (createModalEl && typeof bootstrap !== 'undefined') {
+                new bootstrap.Modal(createModalEl).show();
+            }
+        }
+    });
+</script>

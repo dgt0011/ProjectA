@@ -13,11 +13,13 @@ namespace ProjectA.Api.Tests.Features.ToDo.CreateToDo;
 public class CreateToDoEndpointTests : IAsyncLifetime
 {
     private const string TestCategoryTitle = "Create Test Category";
+    private const string TestProjectTitle = "Create Test Project";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
     private readonly IDbConnectionFactory _connectionFactory;
     private long _categoryId;
+    private long _projectId;
 
     public CreateToDoEndpointTests(ApiFactory factory)
     {
@@ -33,6 +35,9 @@ public class CreateToDoEndpointTests : IAsyncLifetime
         _categoryId = await connection.QuerySingleAsync<long>(
             "INSERT INTO categories (title) VALUES (@Title) RETURNING id;",
             new { Title = TestCategoryTitle });
+        _projectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-01-01') RETURNING id;",
+            new { Title = TestProjectTitle });
     }
 
     public async Task DisposeAsync() => await CleanUpAsync();
@@ -41,9 +46,11 @@ public class CreateToDoEndpointTests : IAsyncLifetime
     {
         using var connection = await _connectionFactory.CreateConnectionAsync();
         await connection.ExecuteAsync(
-            "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title = @Title);",
-            new { Title = TestCategoryTitle });
+            "DELETE FROM todos WHERE category_id IN (SELECT id FROM categories WHERE title = @CategoryTitle) " +
+            "OR project_id IN (SELECT id FROM projects WHERE title = @ProjectTitle);",
+            new { CategoryTitle = TestCategoryTitle, ProjectTitle = TestProjectTitle });
         await connection.ExecuteAsync("DELETE FROM categories WHERE title = @Title;", new { Title = TestCategoryTitle });
+        await connection.ExecuteAsync("DELETE FROM projects WHERE title = @Title;", new { Title = TestProjectTitle });
     }
 
     [Fact]
@@ -108,6 +115,48 @@ public class CreateToDoEndpointTests : IAsyncLifetime
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
         Assert.NotNull(problem);
         Assert.True(problem.Errors.ContainsKey("CategoryId"));
+    }
+
+    [Fact]
+    public async Task Post_WithProjectId_CreatesToDoAssociatedWithProject()
+    {
+        var request = new CreateToDoEndpoint.CreateToDoRequest("Project ToDo", _categoryId, null, _projectId);
+
+        var response = await _client.PostAsJsonAsync("/api/todo", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var created = await response.Content.ReadFromJsonAsync<CreateToDoEndpoint.ToDoResponse>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.Equal(_projectId, created.ProjectId);
+    }
+
+    [Fact]
+    public async Task Post_WithoutProjectId_LeavesProjectIdNull()
+    {
+        var request = new CreateToDoEndpoint.CreateToDoRequest("No project ToDo", _categoryId, null);
+
+        var response = await _client.PostAsJsonAsync("/api/todo", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var created = await response.Content.ReadFromJsonAsync<CreateToDoEndpoint.ToDoResponse>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.Null(created.ProjectId);
+    }
+
+    [Fact]
+    public async Task Post_WithProjectIdThatDoesNotExist_ReturnsValidationProblem()
+    {
+        var request = new CreateToDoEndpoint.CreateToDoRequest("A title", _categoryId, null, 999999);
+
+        var response = await _client.PostAsJsonAsync("/api/todo", request, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.True(problem.Errors.ContainsKey("ProjectId"));
     }
 
     private sealed record ValidationProblemResponse(

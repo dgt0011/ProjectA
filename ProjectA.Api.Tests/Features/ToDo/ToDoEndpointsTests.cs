@@ -17,16 +17,14 @@ public class ToDoEndpointsTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _client;
+    private readonly IDbConnectionFactory _connectionFactory;
 
     public ToDoEndpointsTests(ApiFactory factory)
     {
         _client = factory.CreateAuthenticatedClient();
 
-        var connectionFactory = factory.Services.GetService<IDbConnectionFactory>();
-        if (connectionFactory != null)
-        {
-            ((PostgresDbConnectionFactory)connectionFactory).SeedToDos();
-        }
+        _connectionFactory = factory.Services.GetRequiredService<IDbConnectionFactory>();
+        ((PostgresDbConnectionFactory)_connectionFactory).SeedToDos();
     }
 
     [Fact]
@@ -97,6 +95,44 @@ public class ToDoEndpointsTests
             .ReadFromJsonAsync<GetToDoByIdEndpoint.ToDoResponse>(JsonOptions);
         Assert.NotNull(todo);
         Assert.True(todo.Done);
+    }
+
+    [Fact]
+    public async Task GetList_WithProjectId_ReturnsOnlyThatProjectsToDos()
+    {
+        const string projectTitle = "GetList ProjectId Filter Test Project";
+
+        using var connection = await _connectionFactory.CreateConnectionAsync();
+        await connection.ExecuteAsync(
+            "DELETE FROM todos WHERE project_id IN (SELECT id FROM projects WHERE title = @Title);",
+            new { Title = projectTitle });
+        await connection.ExecuteAsync("DELETE FROM projects WHERE title = @Title;", new { Title = projectTitle });
+
+        var projectId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO projects (title, start_date) VALUES (@Title, '2026-01-01') RETURNING id;",
+            new { Title = projectTitle });
+        var projectToDoId = await connection.QuerySingleAsync<long>(
+            "INSERT INTO todos (title, actioned, date_created, project_id) " +
+            "VALUES ('Project-scoped ToDo', false, now(), @ProjectId) RETURNING id;",
+            new { ProjectId = projectId });
+
+        try
+        {
+            var response = await _client.GetAsync($"/api/todo?includeDone=true&projectId={projectId}");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var todos = await response.Content
+                .ReadFromJsonAsync<List<GetToDoListEndpoint.ToDoListItemResponse>>(JsonOptions);
+            Assert.NotNull(todos);
+            Assert.Single(todos);
+            Assert.Equal(projectToDoId, todos[0].Id);
+            Assert.Equal(projectId, todos[0].ProjectId);
+        }
+        finally
+        {
+            await connection.ExecuteAsync("DELETE FROM todos WHERE id = @Id;", new { Id = projectToDoId });
+            await connection.ExecuteAsync("DELETE FROM projects WHERE id = @Id;", new { Id = projectId });
+        }
     }
 
     [Fact]

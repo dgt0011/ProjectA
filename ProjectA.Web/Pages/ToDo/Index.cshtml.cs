@@ -22,7 +22,7 @@ public class IndexModel(IToDoApiClient toDoApiClient, ICategoriesApiClient categ
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var toDoTask = toDoApiClient.GetListAsync(IncludeDone, cancellationToken);
+        var toDoTask = toDoApiClient.GetListAsync(IncludeDone, cancellationToken: cancellationToken);
         var categoriesTask = categoriesApiClient.GetListAsync(cancellationToken);
         await Task.WhenAll(toDoTask, categoriesTask);
 

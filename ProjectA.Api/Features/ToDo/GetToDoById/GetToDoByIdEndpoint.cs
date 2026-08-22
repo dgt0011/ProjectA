@@ -29,8 +29,10 @@ public static class GetToDoByIdEndpoint
                 var response = new ToDoResponse(
                     entity.id,
                     entity.category_id,
+                    entity.project_id,
                     entity.title,
                     entity.description,
+                    entity.completion_notes,
                     entity.date_created,
                     entity.date_modified,
                     entity.actioned);
@@ -54,8 +56,10 @@ public static class GetToDoByIdEndpoint
     public sealed record ToDoResponse(
         long Id,
         long? CategoryId,
+        long? ProjectId,
         string Title,
         string? Description,
+        string? CompletionNotes,
         DateTime? DateCreated,
         DateTime? DateModified,
         bool Done);

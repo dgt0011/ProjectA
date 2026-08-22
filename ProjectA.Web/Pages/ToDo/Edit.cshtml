@@ -9,6 +9,9 @@
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
 <form method="post" class="col-md-6">
+    @* Not user-editable here (see Edit.cshtml.cs) - just carried through so saving doesn't
+       clear an existing Project association set via the Project Details page. *@
+    <input type="hidden" asp-for="Form.ProjectId" />
     <div class="mb-3">
         <label asp-for="Form.Title" class="form-label"></label>
         <input asp-for="Form.Title" class="form-control" />

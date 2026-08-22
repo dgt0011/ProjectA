@@ -32,6 +32,7 @@ public static class CreateToDoEndpoint
             title = request.Title,
             actioned = false,
             category_id = request.CategoryId,
+            project_id = request.ProjectId,
             description = request.Description,
             date_created = DateTime.UtcNow
         };
@@ -44,17 +45,16 @@ public static class CreateToDoEndpoint
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [nameof(request.CategoryId)] = ["CategoryId does not refer to an existing category."]
-            });
+            return TypedResults.ValidationProblem(BuildForeignKeyViolationError(ex, request));
         }
 
         var response = new ToDoResponse(
             entity.id,
             entity.category_id,
+            entity.project_id,
             entity.title,
             entity.description,
+            entity.completion_notes,
             entity.date_created,
             entity.date_modified,
             entity.actioned);
@@ -79,15 +79,34 @@ public static class CreateToDoEndpoint
         return errors;
     }
 
-    // Request body accepted by this endpoint - owned by this slice, not shared.
-    public sealed record CreateToDoRequest(string Title, long? CategoryId, string? Description);
+    // A ToDo has two independent, plain nullable FK columns (category_id, project_id) - a
+    // constraint violation on either surfaces as the same PostgresErrorCodes.ForeignKeyViolation,
+    // so the constraint name (Postgres's default <table>_<column>_fkey naming, unchanged by any
+    // migration script) is what tells us which field the request actually got wrong.
+    private static Dictionary<string, string[]> BuildForeignKeyViolationError(PostgresException ex, CreateToDoRequest request) =>
+        ex.ConstraintName?.Contains("project_id") == true
+            ? new Dictionary<string, string[]>
+            {
+                [nameof(request.ProjectId)] = ["ProjectId does not refer to an existing project."]
+            }
+            : new Dictionary<string, string[]>
+            {
+                [nameof(request.CategoryId)] = ["CategoryId does not refer to an existing category."]
+            };
+
+    // Request body accepted by this endpoint - owned by this slice, not shared. ProjectId
+    // defaults to null so existing positional-argument call sites (tests, etc.) keep compiling
+    // unchanged - a ToDo created without it behaves exactly as before, with no project association.
+    public sealed record CreateToDoRequest(string Title, long? CategoryId, string? Description, long? ProjectId = null);
 
     // Shape returned to callers of this endpoint - owned by this slice, not shared.
     public sealed record ToDoResponse(
         long Id,
         long? CategoryId,
+        long? ProjectId,
         string Title,
         string? Description,
+        string? CompletionNotes,
         DateTime? DateCreated,
         DateTime? DateModified,
         bool Done);
