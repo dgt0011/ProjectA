@@ -76,4 +76,10 @@ public sealed class NoteTreeItemViewModel
     public required IReadOnlyDictionary<long, List<NoteDto>> ChildrenByParentId { get; init; }
 
     public int Depth { get; init; }
+
+    // Null on the standalone Notes/Details page (its own child-tree display is unchanged - no
+    // Edit button there). Set by Projects/_ProjectNoteItem to that Project's own page URL, so
+    // every Project Note's child notes get an auth-gated "Edit" link too, returning to the
+    // Project page on save - propagated unchanged to every deeper level of the same tree.
+    public string? ReturnUrl { get; init; }
 }
