@@ -49,7 +49,12 @@
                 <div class="mt-2">
                     @foreach (var child in children)
                     {
-                        <partial name="_NoteTreeItem" model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = Model.Depth + 1 })" />
+                        @* Absolute path, not just "_NoteTreeItem" - a bare name resolves relative to
+                           whichever page originally started this render, which is no longer always
+                           a page under /Pages/Notes/ now that Projects/Details also renders this
+                           partial (via _ProjectNoteItem), so a same-folder-relative lookup would
+                           fail as soon as recursion went one level deeper from there. *@
+                        <partial name="/Pages/Notes/_NoteTreeItem.cshtml" model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = Model.Depth + 1 })" />
                     }
                 </div>
             }
