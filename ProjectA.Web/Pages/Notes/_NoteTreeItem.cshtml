@@ -58,8 +58,10 @@
                 <textarea class="d-none note-tree-body-raw" data-note-id="@note.Id">@note.Body</textarea>
                 <div class="border rounded p-2 note-tree-body-rendered" data-note-id="@note.Id"></div>
             }
+            <!-- 
             <a asp-page="/Notes/Details" asp-route-id="@note.Id" class="small d-inline-block mt-1">Open as its own note</a>
-
+            -->
+            
             @if (children.Count > 0)
             {
                 <div class="mt-2">
