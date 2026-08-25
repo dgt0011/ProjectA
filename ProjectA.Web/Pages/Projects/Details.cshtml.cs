@@ -145,16 +145,31 @@ public class DetailsModel(
         Project = result.Value;
 
         var notes = new List<NoteDto>();
+
+        // Keyed by ParentNoteId, built from the FULL notes list (not just this Project's own
+        // associations) - a Note's children aren't necessarily themselves associated with the
+        // Project, they're just that Note's own children wherever they live. Same lookup
+        // Notes/DetailsModel builds for its own child-hierarchy display.
+        IReadOnlyDictionary<long, List<NoteDto>> childrenByParentId = new Dictionary<long, List<NoteDto>>();
+
         if (Project.NoteIds.Count > 0)
         {
             var notesResult = await notesApiClient.GetListAsync(cancellationToken);
             if (notesResult.IsSuccess)
             {
+                var allNotes = notesResult.Value ?? [];
+
                 var noteIds = Project.NoteIds.ToHashSet();
-                notes = (notesResult.Value ?? [])
+                notes = allNotes
                     .Where(note => noteIds.Contains(note.Id))
                     .OrderBy(note => note.DateCreated)
                     .ToList();
+
+                childrenByParentId = allNotes
+                    .Where(note => note.ParentNoteId is not null)
+                    .OrderBy(note => note.DateCreated)
+                    .GroupBy(note => note.ParentNoteId!.Value)
+                    .ToDictionary(group => group.Key, group => group.ToList());
             }
         }
 
@@ -208,6 +223,11 @@ public class DetailsModel(
         AssociatedBookmarks = [.. Project.BookmarkIds.Select(bookmarksById.GetValueOrDefault).OfType<BookmarkDto>()];
         AssociatedAttachments = [.. Project.AttachmentIds.Select(attachmentsById.GetValueOrDefault).OfType<AttachmentDto>()];
 
+        // Same value for every Note on this page - each one's "Edit" link sends the user here
+        // via ?returnUrl=..., so saving on Notes/Edit redirects back to this Project instead of
+        // to the Notes list.
+        var returnUrl = Url.Page("/Projects/Details", new { id = Id }) ?? $"/Projects/Details/{Id}";
+
         AssociatedNoteItems = notes
             .Select(note => new ProjectNoteItemViewModel
             {
@@ -215,7 +235,9 @@ public class DetailsModel(
                 AssociatedBookmarks = [.. note.BookmarkIds.Select(bookmarksById.GetValueOrDefault).OfType<BookmarkDto>()],
                 AssociatedAttachments = [.. note.AttachmentIds.Select(attachmentsById.GetValueOrDefault).OfType<AttachmentDto>()],
                 BookmarkTypesById = bookmarkTypesById,
-                AttachmentTypesById = _attachmentTypesById
+                AttachmentTypesById = _attachmentTypesById,
+                ChildrenByParentId = childrenByParentId,
+                ReturnUrl = returnUrl
             })
             .ToList();
 

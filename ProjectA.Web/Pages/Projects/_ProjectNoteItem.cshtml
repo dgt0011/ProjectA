@@ -2,6 +2,7 @@
 @{
     var note = Model.Note;
     var collapseId = $"project-note-collapse-{note.Id}";
+    var children = Model.ChildrenByParentId.TryGetValue(note.Id, out var kids) ? kids : [];
 
     BookmarkTypeDto? GetBookmarkType(long? bookmarkTypeId) =>
         bookmarkTypeId is { } id ? Model.BookmarkTypesById.GetValueOrDefault(id) : null;
@@ -15,7 +16,7 @@
    alongside the Notes immediately before and after it without navigating away. *@
 <div class="card mb-2">
     <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-start">
             <div class="d-flex align-items-center">
                 <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
                         data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId" aria-label="Expand note">
@@ -27,13 +28,20 @@
                     <span class="badge text-bg-secondary ms-2">Private</span>
                 }
             </div>
-            <span class="text-muted small">
-                Created : @note.DateCreated.ToLocalTime().ToString("dd MMM yy")
-                @if (note.DateModified is { } modified)
+            <div class="text-end">
+                @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <text>| Modified : @modified.ToLocalTime().ToString("dd MMM yy HH:mm")</text>
+                    <a asp-page="/Notes/Edit" asp-route-id="@note.Id" asp-route-returnUrl="@Model.ReturnUrl"
+                       class="btn btn-sm btn-outline-secondary mb-1">Edit</a>
                 }
-            </span>
+                <div class="text-muted small">
+                    Created : @note.DateCreated.ToLocalTime().ToString("dd MMM yy")
+                    @if (note.DateModified is { } modified)
+                    {
+                        <text>| Modified : @modified.ToLocalTime().ToString("dd MMM yy HH:mm")</text>
+                    }
+                </div>
+            </div>
         </div>
 
         <div class="collapse project-note-collapse mt-2" id="@collapseId">
@@ -108,6 +116,21 @@
             }
 
             <a asp-page="/Notes/Details" asp-route-id="@note.Id" class="small d-inline-block mt-2">Open as its own note</a>
+
+            @if (children.Count > 0)
+            {
+                @* Rendered expanded (not just listed) as soon as this Note is expanded, via
+                   Notes' own recursive _NoteTreeItem partial - matches how a Note's child
+                   hierarchy is shown on its own standalone Details page. *@
+                <div class="mt-3">
+                    <h3 class="h6">Child notes</h3>
+                    @foreach (var child in children)
+                    {
+                        <partial name="/Pages/Notes/_NoteTreeItem.cshtml"
+                                 model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = 1 })" />
+                    }
+                </div>
+            }
         </div>
     </div>
 </div>
