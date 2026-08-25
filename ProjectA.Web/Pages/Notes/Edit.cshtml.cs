@@ -17,6 +17,17 @@ public class EditModel(
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
 
+    // Set (e.g. by Projects/Details' per-Note "Edit" links) so saving here returns the user to
+    // wherever they came from instead of always landing on the Notes list. Bound from the query
+    // string on GET, then round-tripped through the POST via a hidden field on the form.
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
+    // Validated once so both the Cancel link and the post-save redirect use the same,
+    // already-checked target - Url.IsLocalUrl guards against ReturnUrl (an ordinary,
+    // user-controllable query string value) being used as an open-redirect vector.
+    public string SafeReturnUrl => ReturnUrl is not null && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : Url.Page("Index")!;
+
     [BindProperty]
     public NoteInput Form { get; set; } = new();
 
@@ -73,7 +84,7 @@ public class EditModel(
         }
 
         TempData["SuccessMessage"] = "Note updated.";
-        return RedirectToPage("Index");
+        return LocalRedirect(SafeReturnUrl);
     }
 
     private async Task LoadAssociationOptionsAsync(CancellationToken cancellationToken)

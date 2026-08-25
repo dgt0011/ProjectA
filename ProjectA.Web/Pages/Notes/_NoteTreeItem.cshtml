@@ -11,7 +11,12 @@
    Date Created and Date Modified via the toggle button. *@
 <div class="card mb-2" style="margin-left: @(Model.Depth * 24)px;">
     <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-center">
+        @* The whole header row doubles as the toggle now (not just the icon button) - matches
+           the same "click the whole collapsed card" behavior as _ProjectNoteItem. The Edit
+           link stops its own click from bubbling up to this row (via stopPropagation), so
+           clicking Edit navigates instead of also toggling the Note open/closed. *@
+        <div class="d-flex justify-content-between align-items-start"
+             data-bs-toggle="collapse" data-bs-target="#@collapseId" style="cursor: pointer;">
             <div class="d-flex align-items-center">
                 <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
                         data-bs-target="#@collapseId" aria-expanded="true" aria-controls="@collapseId" aria-label="Collapse note">
@@ -23,13 +28,24 @@
                     <span class="badge text-bg-secondary ms-2">Private</span>
                 }
             </div>
-            <span class="text-muted small">
-                Created @note.DateCreated.ToLocalTime().ToString("g")
-                @if (note.DateModified is { } modified)
+            <div class="text-end">
+                @* Only rendered when a ReturnUrl was supplied - i.e. reached via a Project's
+                   Details page (see _ProjectNoteItem), which is the only place this tree
+                   currently needs an Edit link; the standalone Notes/Details page's own
+                   child-tree display is unchanged. *@
+                @if (Model.ReturnUrl is not null && User.Identity?.IsAuthenticated == true)
                 {
-                    <text>&middot; Modified @modified.ToLocalTime().ToString("g")</text>
+                    <a asp-page="/Notes/Edit" asp-route-id="@note.Id" asp-route-returnUrl="@Model.ReturnUrl"
+                       class="btn btn-sm btn-outline-secondary mb-1" onclick="event.stopPropagation();">Edit</a>
                 }
-            </span>
+                <div class="text-muted small">
+                    Created @note.DateCreated.ToLocalTime().ToString("g")
+                    @if (note.DateModified is { } modified)
+                    {
+                        <text>&middot; Modified @modified.ToLocalTime().ToString("g")</text>
+                    }
+                </div>
+            </div>
         </div>
 
         <div class="collapse show note-collapse mt-2" id="@collapseId">
@@ -42,14 +58,21 @@
                 <textarea class="d-none note-tree-body-raw" data-note-id="@note.Id">@note.Body</textarea>
                 <div class="border rounded p-2 note-tree-body-rendered" data-note-id="@note.Id"></div>
             }
+            <!-- 
             <a asp-page="/Notes/Details" asp-route-id="@note.Id" class="small d-inline-block mt-1">Open as its own note</a>
-
+            -->
+            
             @if (children.Count > 0)
             {
                 <div class="mt-2">
                     @foreach (var child in children)
                     {
-                        <partial name="_NoteTreeItem" model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = Model.Depth + 1 })" />
+                        @* Absolute path, not just "_NoteTreeItem" - a bare name resolves relative to
+                           whichever page originally started this render, which is no longer always
+                           a page under /Pages/Notes/ now that Projects/Details also renders this
+                           partial (via _ProjectNoteItem), so a same-folder-relative lookup would
+                           fail as soon as recursion went one level deeper from there. *@
+                        <partial name="/Pages/Notes/_NoteTreeItem.cshtml" model="@(new NoteTreeItemViewModel { Note = child, ChildrenByParentId = Model.ChildrenByParentId, Depth = Model.Depth + 1, ReturnUrl = Model.ReturnUrl })" />
                     }
                 </div>
             }

@@ -9,6 +9,9 @@
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
 <form method="post" class="col-md-8">
+    @* Not user-editable - just carried through so a signed-in POST still knows where to send
+       the user back to after saving (see EditModel.SafeReturnUrl). *@
+    <input type="hidden" asp-for="ReturnUrl" />
     <div class="mb-3">
         <label asp-for="Form.Title" class="form-label"></label>
         <input asp-for="Form.Title" class="form-control" />
@@ -95,7 +98,7 @@
     </div>
     
     <button type="submit" class="btn btn-primary">Save</button>
-    <a asp-page="Index" class="btn btn-link">Cancel</a>
+    <a href="@Model.SafeReturnUrl" class="btn btn-link">Cancel</a>
 </form>
 
 @section Scripts {

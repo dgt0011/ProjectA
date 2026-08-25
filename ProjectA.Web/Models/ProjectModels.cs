@@ -68,4 +68,17 @@ public sealed class ProjectNoteItemViewModel
 
     // Same shared-lookup reasoning as BookmarkTypesById, mirrored for Attachments.
     public required IReadOnlyDictionary<long, AttachmentTypeDto> AttachmentTypesById { get; init; }
+
+    // Built once (from the full, unfiltered notes list) in DetailsModel and handed down
+    // unchanged to every top-level Note on the page, the same shared-lookup pattern as
+    // BookmarkTypesById/AttachmentTypesById - a Note's children aren't necessarily themselves
+    // associated with this Project, so this can't be derived from AssociatedNoteItems alone.
+    // Passed straight through to Notes' own _NoteTreeItem partial (via NoteTreeItemViewModel)
+    // to render this Note's child hierarchy, expanded, the same way Notes/Details.cshtml does.
+    public required IReadOnlyDictionary<long, List<NoteDto>> ChildrenByParentId { get; init; }
+
+    // This Project's own Details page URL, precomputed once in DetailsModel (every Note on the
+    // page shares the same value) - handed to each Note's "Edit" link as ?returnUrl=... so
+    // Notes/Edit sends the user back here after saving instead of to the Notes list.
+    public required string ReturnUrl { get; init; }
 }
