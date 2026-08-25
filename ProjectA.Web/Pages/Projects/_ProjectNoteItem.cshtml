@@ -16,7 +16,13 @@
    alongside the Notes immediately before and after it without navigating away. *@
 <div class="card mb-2">
     <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-start">
+        @* The whole header row doubles as the toggle now (not just the icon button) - when the
+           Note is collapsed, this row is the entire visible card, so this makes the entire
+           collapsed card clickable to expand it. The Edit link stops its own click from
+           bubbling up to this row (via stopPropagation), so clicking Edit navigates instead of
+           also toggling the Note open/closed. *@
+        <div class="d-flex justify-content-between align-items-start project-note-header"
+             data-bs-toggle="collapse" data-bs-target="#@collapseId" style="cursor: pointer;">
             <div class="d-flex align-items-center">
                 <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
                         data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId" aria-label="Expand note">
@@ -32,7 +38,7 @@
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <a asp-page="/Notes/Edit" asp-route-id="@note.Id" asp-route-returnUrl="@Model.ReturnUrl"
-                       class="btn btn-sm btn-outline-secondary mb-1">Edit</a>
+                       class="btn btn-sm btn-outline-secondary mb-1" onclick="event.stopPropagation();">Edit</a>
                 }
                 <div class="text-muted small">
                     Created : @note.DateCreated.ToLocalTime().ToString("dd MMM yy")

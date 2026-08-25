@@ -11,7 +11,12 @@
    Date Created and Date Modified via the toggle button. *@
 <div class="card mb-2" style="margin-left: @(Model.Depth * 24)px;">
     <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-start">
+        @* The whole header row doubles as the toggle now (not just the icon button) - matches
+           the same "click the whole collapsed card" behavior as _ProjectNoteItem. The Edit
+           link stops its own click from bubbling up to this row (via stopPropagation), so
+           clicking Edit navigates instead of also toggling the Note open/closed. *@
+        <div class="d-flex justify-content-between align-items-start"
+             data-bs-toggle="collapse" data-bs-target="#@collapseId" style="cursor: pointer;">
             <div class="d-flex align-items-center">
                 <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
                         data-bs-target="#@collapseId" aria-expanded="true" aria-controls="@collapseId" aria-label="Collapse note">
@@ -31,7 +36,7 @@
                 @if (Model.ReturnUrl is not null && User.Identity?.IsAuthenticated == true)
                 {
                     <a asp-page="/Notes/Edit" asp-route-id="@note.Id" asp-route-returnUrl="@Model.ReturnUrl"
-                       class="btn btn-sm btn-outline-secondary mb-1">Edit</a>
+                       class="btn btn-sm btn-outline-secondary mb-1" onclick="event.stopPropagation();">Edit</a>
                 }
                 <div class="text-muted small">
                     Created @note.DateCreated.ToLocalTime().ToString("g")
