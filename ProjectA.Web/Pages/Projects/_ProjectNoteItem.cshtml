@@ -15,13 +15,24 @@
    of titles/dates first - expanding one reveals the Note in full, in place, so it can be read
    alongside the Notes immediately before and after it without navigating away. *@
 <div class="card mb-2">
-    <div class="card-body py-2">
+    <div class="card-body py-2 position-relative">
+        @* Edit is an absolutely-positioned overlay, a sibling of the toggle row below rather
+           than nested inside it - Bootstrap's collapse toggle is wired up via a click listener
+           on document registered with useCapture (so it always sees event.target.closest
+           first, before any descendant's own click handler runs), so a stopPropagation() call
+           on a link nested inside the toggle row can't stop it from also toggling the collapse.
+           Keeping Edit out of that row entirely avoids the problem structurally instead. *@
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="position-absolute top-0 end-0 p-2">
+                <a asp-page="/Notes/Edit" asp-route-id="@note.Id" asp-route-returnUrl="@Model.ReturnUrl"
+                   class="btn btn-sm btn-outline-secondary">Edit</a>
+            </div>
+        }
         @* The whole header row doubles as the toggle now (not just the icon button) - when the
            Note is collapsed, this row is the entire visible card, so this makes the entire
-           collapsed card clickable to expand it. The Edit link stops its own click from
-           bubbling up to this row (via stopPropagation), so clicking Edit navigates instead of
-           also toggling the Note open/closed. *@
-        <div class="d-flex justify-content-between align-items-start project-note-header"
+           collapsed card clickable to expand it. *@
+        <div class="d-flex justify-content-between align-items-start pe-5"
              data-bs-toggle="collapse" data-bs-target="#@collapseId" style="cursor: pointer;">
             <div class="d-flex align-items-center">
                 <button class="btn btn-sm btn-link p-0 me-2" type="button" data-bs-toggle="collapse"
@@ -34,19 +45,12 @@
                     <span class="badge text-bg-secondary ms-2">Private</span>
                 }
             </div>
-            <div class="text-end">
-                @if (User.Identity?.IsAuthenticated == true)
+            <div class="text-muted small text-end">
+                Created : @note.DateCreated.ToLocalTime().ToString("dd MMM yy")
+                @if (note.DateModified is { } modified)
                 {
-                    <a asp-page="/Notes/Edit" asp-route-id="@note.Id" asp-route-returnUrl="@Model.ReturnUrl"
-                       class="btn btn-sm btn-outline-secondary mb-1" onclick="event.stopPropagation();">Edit</a>
+                    <text>| Modified : @modified.ToLocalTime().ToString("dd MMM yy HH:mm")</text>
                 }
-                <div class="text-muted small">
-                    Created : @note.DateCreated.ToLocalTime().ToString("dd MMM yy")
-                    @if (note.DateModified is { } modified)
-                    {
-                        <text>| Modified : @modified.ToLocalTime().ToString("dd MMM yy HH:mm")</text>
-                    }
-                </div>
             </div>
         </div>
 
