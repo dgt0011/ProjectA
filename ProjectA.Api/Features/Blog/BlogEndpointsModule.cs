@@ -57,9 +57,11 @@ public static class BlogEndpointsModule
             .RequireAuthorization()
             .MapBlogSettingsEndpoints();
 
-        app.MapGroup("/api/blog/analytics")
+        var analytics = app.MapGroup("/api/blog/analytics")
             .WithTags("Blog analytics")
-            .RequireAuthorization()
-            .MapGetBlogAnalytics();
+            .RequireAuthorization();
+
+        analytics.MapGetBlogAnalytics();
+        analytics.MapGetBlogDailyViews();
     }
 }

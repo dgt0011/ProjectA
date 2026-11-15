@@ -12,7 +12,7 @@ public interface IBlogApiClient
     Task<ApiResult<PostPage>> GetPublishedAsync(int page, string? category, CancellationToken cancellationToken = default);
     Task<ApiResult<PostPage>> SearchAsync(string term, int page, CancellationToken cancellationToken = default);
     Task<ApiResult<PostDetail>> GetPostAsync(string slug, CancellationToken cancellationToken = default);
-    Task RecordViewAsync(string slug, CancellationToken cancellationToken = default);
+    Task RecordViewAsync(string slug, string? ipAddress, string? userAgent, CancellationToken cancellationToken = default);
     Task<ApiResult<List<FeedEntry>>> GetFeedAsync(CancellationToken cancellationToken = default);
     Task<ApiResult<List<SitemapEntry>>> GetSitemapAsync(CancellationToken cancellationToken = default);
 }
@@ -56,10 +56,11 @@ public sealed class BlogApiClient(HttpClient httpClient, IMemoryCache cache, ILo
     public Task<ApiResult<PostDetail>> GetPostAsync(string slug, CancellationToken cancellationToken = default) =>
         GetJsonAsync<PostDetail>($"api/blog/published/{Uri.EscapeDataString(slug)}", cancellationToken);
 
-    public async Task RecordViewAsync(string slug, CancellationToken cancellationToken = default)
+    public async Task RecordViewAsync(string slug, string? ipAddress, string? userAgent, CancellationToken cancellationToken = default)
     {
         // Best effort - a failed view count must never break rendering the post.
-        var result = await PostJsonAsync<object?, object>($"api/blog/published/{Uri.EscapeDataString(slug)}/views", null, cancellationToken);
+        var result = await PostJsonAsync<RecordViewRequest, object>(
+            $"api/blog/published/{Uri.EscapeDataString(slug)}/views", new RecordViewRequest(ipAddress, userAgent), cancellationToken);
         if (!result.IsSuccess)
         {
             logger.LogDebug("Could not record a view for {Slug} ({Status})", slug, result.StatusCode);
@@ -72,3 +73,7 @@ public sealed class BlogApiClient(HttpClient httpClient, IMemoryCache cache, ILo
     public Task<ApiResult<List<SitemapEntry>>> GetSitemapAsync(CancellationToken cancellationToken = default) =>
         GetJsonAsync<List<SitemapEntry>>("api/blog/sitemap", cancellationToken);
 }
+
+// Body of POST /api/blog/published/{slug}/views - the reader's details, which the API can't
+// see itself because every request it gets comes from this site.
+public sealed record RecordViewRequest(string? IpAddress, string? UserAgent);

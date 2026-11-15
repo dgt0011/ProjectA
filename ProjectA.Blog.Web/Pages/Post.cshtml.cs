@@ -39,7 +39,10 @@ public class PostModel(IBlogApiClient blogApi) : PageModel
             return RedirectPermanent(BlogFormat.PostPath(Detail.Post.PostType, Detail.Post.Slug));
         }
 
-        await blogApi.RecordViewAsync(slug, cancellationToken);
+        // RemoteIpAddress is the reader's address: UseForwardedHeaders replaces nginx's with the
+        // X-Forwarded-For value nginx appended.
+        await blogApi.RecordViewAsync(
+            slug, HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent.ToString(), cancellationToken);
 
         ContentHtml = BlogFormat.MarkdownToHtml(Detail.Content);
         DefaultCover = (await siteTask).Cover ?? BlogFormat.DefaultCover;

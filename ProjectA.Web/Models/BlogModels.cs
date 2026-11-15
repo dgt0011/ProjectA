@@ -193,6 +193,50 @@ public sealed class BlogPostViewsDto
     public DateTime PublishedAt { get; set; }
 }
 
+// GET /api/blog/analytics/daily - views per UTC day for one post/page (PostId) or the whole blog.
+public sealed class BlogDailyViewsDto
+{
+    public long? PostId { get; set; }
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+    public int TotalViews { get; set; }
+    public List<BlogDayViewsDto> Days { get; set; } = [];
+    public List<BlogPostViewTotalDto> Posts { get; set; } = [];
+}
+
+public sealed class BlogDayViewsDto
+{
+    public DateOnly Day { get; set; }
+    public int Views { get; set; }
+}
+
+public sealed class BlogPostViewTotalDto
+{
+    public long Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public short PostType { get; set; }
+    public int Views { get; set; }
+}
+
+// GET /api/blog/analytics/daily/{day} - one day's views grouped by IP address + user agent.
+public sealed class BlogDailyVisitorsDto
+{
+    public long? PostId { get; set; }
+    public DateOnly Day { get; set; }
+    public int TotalViews { get; set; }
+    public List<BlogVisitorDto> Visitors { get; set; } = [];
+}
+
+public sealed class BlogVisitorDto
+{
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public int Views { get; set; }
+    public DateTime FirstViewedAt { get; set; }
+    public DateTime LastViewedAt { get; set; }
+    public string Posts { get; set; } = string.Empty;
+}
+
 public sealed class UserProfileDto
 {
     public long Id { get; set; }

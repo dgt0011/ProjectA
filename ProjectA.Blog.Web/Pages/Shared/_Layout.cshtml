@@ -26,6 +26,9 @@
     <meta name="description" content="@pageDescription">
     <link rel="alternate" type="application/rss+xml" title="@site.Title" href="@absoluteUrl/feed/rss" />
     <link rel="canonical" href="@canonical" />
+    @* No favicon: an empty data: icon stops browsers requesting /favicon.ico (which would 404). *@
+    <link rel="icon" href="data:,">
+
     @Html.Raw(site.HeaderScript)
 
     <style>

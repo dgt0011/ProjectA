@@ -80,6 +80,8 @@ public interface IBlogAdminApiClient
     Task<ApiResult<BlogSettingsDto>> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<ApiResult<BlogSettingsDto>> UpdateSettingsAsync(BlogSettingsInput input, CancellationToken cancellationToken = default);
     Task<ApiResult<BlogAnalyticsDto>> GetAnalyticsAsync(int latest, CancellationToken cancellationToken = default);
+    Task<ApiResult<BlogDailyViewsDto>> GetDailyViewsAsync(int days, long? postId, CancellationToken cancellationToken = default);
+    Task<ApiResult<BlogDailyVisitorsDto>> GetDailyVisitorsAsync(DateOnly day, long? postId, CancellationToken cancellationToken = default);
 }
 
 public sealed class BlogAdminApiClient(HttpClient httpClient) : ApiClientBase(httpClient), IBlogAdminApiClient
@@ -92,4 +94,12 @@ public sealed class BlogAdminApiClient(HttpClient httpClient) : ApiClientBase(ht
 
     public Task<ApiResult<BlogAnalyticsDto>> GetAnalyticsAsync(int latest, CancellationToken cancellationToken = default) =>
         GetJsonAsync<BlogAnalyticsDto>($"api/blog/analytics?latest={latest}", cancellationToken);
+
+    public Task<ApiResult<BlogDailyViewsDto>> GetDailyViewsAsync(int days, long? postId, CancellationToken cancellationToken = default) =>
+        GetJsonAsync<BlogDailyViewsDto>(
+            $"api/blog/analytics/daily?days={days}" + (postId is { } id ? $"&postId={id}" : ""), cancellationToken);
+
+    public Task<ApiResult<BlogDailyVisitorsDto>> GetDailyVisitorsAsync(DateOnly day, long? postId, CancellationToken cancellationToken = default) =>
+        GetJsonAsync<BlogDailyVisitorsDto>(
+            $"api/blog/analytics/daily/{day:yyyy-MM-dd}" + (postId is { } id ? $"?postId={id}" : ""), cancellationToken);
 }
