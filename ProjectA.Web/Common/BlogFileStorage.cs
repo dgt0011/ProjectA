@@ -22,6 +22,37 @@ public sealed class BlogFileStorage(IConfiguration configuration, IWebHostEnviro
 
     public static readonly long MaxFileBytes = 25 * 1024 * 1024;
 
+    // Linux/EFS allow 255 bytes per file name; the stored name adds a 9-character prefix, and
+    // non-Latin names take up to 4 UTF-8 bytes a character, so the client's name is cut to this.
+    public const int MaxNameBytes = 150;
+
+    // Sent with every file served from /data (ProjectA.Blog.Web uses the same policy): images
+    // and media display, but a file opened as a document can't run script or load anything.
+    public const string UploadContentSecurityPolicy = "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox";
+
+    // Shortens the name part (keeping the extension, which IsAllowed has already checked) until
+    // the whole name fits MaxNameBytes, without splitting a surrogate pair.
+    internal static string LimitLength(string fileName)
+    {
+        if (System.Text.Encoding.UTF8.GetByteCount(fileName) <= MaxNameBytes)
+        {
+            return fileName;
+        }
+
+        var extension = Path.GetExtension(fileName);
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        while (stem.Length > 0 && System.Text.Encoding.UTF8.GetByteCount(stem + extension) > MaxNameBytes)
+        {
+            stem = stem[..^1];
+            if (stem.Length > 0 && char.IsHighSurrogate(stem[^1]))
+            {
+                stem = stem[..^1];
+            }
+        }
+
+        return (stem.Length > 0 ? stem : "file") + extension;
+    }
+
     public string RootPath
     {
         get
@@ -66,7 +97,7 @@ public sealed class BlogFileStorage(IConfiguration configuration, IWebHostEnviro
         // Path.GetFileName strips any directory part a client smuggles into the name; the short
         // random prefix stops two uploads with the same name overwriting each other while
         // keeping the original name readable in the URL.
-        var originalName = Path.GetFileName(file.FileName).Replace(' ', '-');
+        var originalName = LimitLength(Path.GetFileName(file.FileName).Replace(' ', '-'));
         var storedName = $"{Guid.NewGuid().ToString("N")[..8]}-{originalName}";
 
         await using (var stream = new FileStream(Path.Combine(folder, storedName), FileMode.CreateNew))

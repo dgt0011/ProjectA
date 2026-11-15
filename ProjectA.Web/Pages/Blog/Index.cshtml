@@ -175,6 +175,13 @@
                     (daily.postId ? '&postId=' + encodeURIComponent(daily.postId) : '');
                 fetch(url, { signal: pending.signal, headers: { 'X-Requested-With': 'fetch' } })
                     .then(function (response) {
+                        // An expired sign-in redirects to the login page, which fetch follows
+                        // and reports as success - reload so the browser goes to sign in instead
+                        // of showing the login page inside the modal.
+                        if (response.redirected) {
+                            window.location.reload();
+                            throw new DOMException('Signed out', 'AbortError');
+                        }
                         if (!response.ok) {
                             throw new Error('HTTP ' + response.status);
                         }

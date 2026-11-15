@@ -4,7 +4,7 @@ using Markdig;
 namespace ProjectA.Blog.Web.Common;
 
 // Rendering helpers that reproduce Blogifier's output so pages look the same as before.
-public static class BlogFormat
+public static partial class BlogFormat
 {
     public const string DefaultCover = "img/cover.jpg";
 
@@ -44,6 +44,21 @@ public static class BlogFormat
             ? value
             : "/" + value;
     }
+
+    // Rewrites src/href values that are site-relative ("/data/x.jpg", "/posts/y") or Blogifier's
+    // slashless root-relative form ("data/2/626.jpg", "img/x.png") to absolute URLs on siteRoot,
+    // for output read outside the site (RSS). Absolute URLs, protocol-relative "//", fragments,
+    // mailto:/data: and other schemes are left alone.
+    public static string AbsolutizeUrls(string html, string siteRoot) =>
+        string.IsNullOrEmpty(html)
+            ? html
+            : RelativeUrlAttribute().Replace(html, m =>
+                $"{m.Groups["attr"].Value}={m.Groups["quote"].Value}{siteRoot.TrimEnd('/')}/{m.Groups["path"].Value.TrimStart('/')}");
+
+    [System.Text.RegularExpressions.GeneratedRegex(
+        """(?<attr>\b(?:src|href))=(?<quote>["'])(?<path>(?:/(?!/)|(?:data|img)/)[^"']*)""",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex RelativeUrlAttribute();
 
     public static string PostPath(short postType, string slug) =>
         postType == Models.PostType.Page ? $"/{slug}" : $"/posts/{slug}";

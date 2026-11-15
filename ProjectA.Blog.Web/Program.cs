@@ -19,9 +19,12 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AddPageRoute("/Post", "{slug}");
 });
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ViewRecordingPolicy>();
 builder.Services.AddOutputCache(options =>
 {
-    options.AddPolicy("feeds", policy => policy.Expire(TimeSpan.FromMinutes(20)));
+    // Query strings don't change the feed or sitemap, so they aren't part of the cache key -
+    // otherwise /feed/rss?x=<random> would miss the cache (and hit the API) on every request.
+    options.AddPolicy("feeds", policy => policy.Expire(TimeSpan.FromMinutes(20)).SetVaryByQuery(Array.Empty<string>()));
 });
 
 var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"];
@@ -38,17 +41,32 @@ builder.Services.AddHttpClient<IBlogApiClient, BlogApiClient>(client =>
 });
 
 // nginx terminates TLS and proxies to Kestrel on localhost; without this, Request.Scheme would
-// be "http" and every canonical/RSS/share URL would point at http://.
+// be "http" and every canonical/RSS/share URL would point at http://, and the reader's IP
+// (recorded with post views) would be nginx's.
+// - Only the loopback proxy (the defaults in KnownProxies/KnownIPNetworks) is trusted.
+// - X-Forwarded-Host is deliberately NOT honoured: nginx already passes the real host in Host,
+//   and passes a client-supplied X-Forwarded-Host through untouched, which would let anyone
+//   choose the host used in canonical, feed and sitemap links.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+
+// Baseline security headers on every response (pages, feed, static files). No site-wide CSP:
+// the admin-managed header/footer scripts and raw HTML in posts are allowed by design, so a
+// policy would have to permit inline script anyway. Uploads under /data get a strict one below.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers.XContentTypeOptions = "nosniff";
+    headers.XFrameOptions = "SAMEORIGIN";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
 
 if (!app.Environment.IsDevelopment())
 {
@@ -69,7 +87,11 @@ Directory.CreateDirectory(storageRoot);
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(storageRoot),
-    RequestPath = "/data"
+    RequestPath = "/data",
+    // Uploaded files are only ever images/documents to display or download; if one were ever
+    // rendered as a document (a polyglot, or a misnamed upload), it can't run script or reach
+    // anything.
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.ContentSecurityPolicy = BlogStorage.UploadContentSecurityPolicy
 });
 
 app.UseRouting();
@@ -83,7 +105,8 @@ var adminUrl = app.Configuration["BlogSite:AdminUrl"];
 app.MapGet("/admin/{**rest}", () => string.IsNullOrWhiteSpace(adminUrl) ? Results.NotFound() : Results.Redirect(adminUrl));
 
 // RSS 2.0 feed at Blogifier's address (/feed/rss) - kept so existing subscribers keep working.
-app.MapGet("/feed/{type}", async (HttpContext context, IBlogApiClient api, CancellationToken cancellationToken) =>
+// Only "rss" exists; any other {type} is a 404 rather than another separately cached copy.
+app.MapGet("/feed/{type:regex(^rss$)}", async (HttpContext context, IBlogApiClient api, CancellationToken cancellationToken) =>
 {
     var siteTask = api.GetSiteAsync(cancellationToken);
     var entriesResult = await api.GetFeedAsync(cancellationToken);
@@ -102,7 +125,10 @@ app.MapGet("/feed/{type}", async (HttpContext context, IBlogApiClient api, Cance
         Items = entries.Select(entry =>
         {
             var url = $"{host}/posts/{entry.Slug}";
-            var item = new SyndicationItem(entry.Title, BlogFormat.MarkdownToHtml(entry.Content), new Uri(url), url, entry.PublishedAt)
+            // Feed readers don't resolve site-relative links ("/data/...", "data/...") against
+            // the site, so they are made absolute.
+            var body = BlogFormat.AbsolutizeUrls(BlogFormat.MarkdownToHtml(entry.Content), host);
+            var item = new SyndicationItem(entry.Title, body, new Uri(url), url, entry.PublishedAt)
             {
                 PublishDate = entry.PublishedAt
             };

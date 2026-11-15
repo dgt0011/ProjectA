@@ -57,7 +57,7 @@ public static class GetPublishedPostBySlugEndpoint
             connection, "p.post_type = 1 AND p.id <> @Id", "", new { Id = row.id }, cancellationToken);
         var candidateCategories = await BlogPostCategoryLinks.GetForPostsAsync(
             connection, candidates.Select(c => c.id).ToList(), cancellationToken);
-        var related = BlogSearchRanking.Rank(candidates, candidateCategories, row.title)
+        var related = BlogSearchRanking.Rank(candidates, candidateCategories, row.title, cancellationToken)
             .Take(RelatedPostCount)
             .Select(r => PublishedPosts.ToSummary(r.Row, candidateCategories[r.Row.id]))
             .ToList();

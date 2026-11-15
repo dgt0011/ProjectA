@@ -4,14 +4,28 @@ After=network.target mnt-data.mount
 
 [Service]
 Type=simple
-User={{ admin_user }}
-Group={{ admin_user }}
+# Dedicated unprivileged account (see blogweb_user in defaults/main.yml) - not the sudo-capable
+# admin user, and with no write access to the app or upload folders.
+User={{ blogweb_user }}
+Group={{ blogweb_user }}
 WorkingDirectory={{ blogweb_dir }}
 ExecStart={{ blogweb_dir }}/{{ blogweb_executable }}
 Restart=on-failure
 RestartSec=5
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://127.0.0.1:{{ blogweb_port }}
+
+# Hardening: the app only reads its own files and the blog uploads, and never writes to disk.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
 
 [Install]
 WantedBy=multi-user.target

@@ -42,21 +42,23 @@ public class SettingsModel(IBlogAdminApiClient blogAdminApiClient, BlogFileStora
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        if (CoverFile is not null)
+        if (CoverFile is not null && !BlogFileStorage.IsAllowed(CoverFile, out var error))
         {
-            if (BlogFileStorage.IsAllowed(CoverFile, out var error))
-            {
-                Form.Cover = await blogFileStorage.SaveAsync(CoverFile, cancellationToken);
-            }
-            else
-            {
-                ModelState.AddModelError(nameof(CoverFile), error);
-            }
+            ModelState.AddModelError(nameof(CoverFile), error);
         }
 
         if (!ModelState.IsValid)
         {
             return Page();
+        }
+
+        // Saved only once the form is otherwise valid, so a rejected form leaves no stray public
+        // file. If the API save still fails, the new path is shown in the Cover box (ModelState
+        // would otherwise re-show the posted value) and a resubmit reuses the same file.
+        if (CoverFile is not null)
+        {
+            Form.Cover = await blogFileStorage.SaveAsync(CoverFile, cancellationToken);
+            ModelState.Remove($"{nameof(Form)}.{nameof(Form.Cover)}");
         }
 
         var result = await blogAdminApiClient.UpdateSettingsAsync(Form, cancellationToken);

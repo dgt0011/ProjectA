@@ -65,13 +65,22 @@ public static class CreateBlogPostEndpoint
             date_created = now
         };
 
-        using var transaction = connection.BeginTransaction();
-        // Dapper.Contrib writes the generated identity back onto entity.id (its int return
-        // value would truncate a BIGINT id, so it's deliberately not used).
-        await connection.InsertAsync(entity, transaction);
-        var id = entity.id;
-        await BlogPostCategoryLinks.ReplaceAsync(connection, transaction, id, request.Categories, cancellationToken);
-        transaction.Commit();
+        long id;
+        try
+        {
+            using var transaction = connection.BeginTransaction();
+            // Dapper.Contrib writes the generated identity back onto entity.id (its int return
+            // value would truncate a BIGINT id, so it's deliberately not used).
+            await connection.InsertAsync(entity, transaction);
+            id = entity.id;
+            await BlogPostCategoryLinks.ReplaceAsync(connection, transaction, id, request.Categories, cancellationToken);
+            transaction.Commit();
+        }
+        catch (Npgsql.PostgresException ex) when (BlogSlugs.IsSlugConflict(ex))
+        {
+            // Another save took the slug between the check above and this insert.
+            return BlogSlugs.ConflictProblem(slug);
+        }
 
         var response = (await BlogPostResponses.LoadAsync(connection, id, cancellationToken))!;
         return TypedResults.CreatedAtRoute(response, "GetBlogPostById", new { id });

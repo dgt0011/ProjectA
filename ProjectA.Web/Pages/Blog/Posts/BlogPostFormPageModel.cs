@@ -46,6 +46,11 @@ public abstract class BlogPostFormPageModel(
         }
 
         Form.Cover = await blogFileStorage.SaveAsync(CoverFile, cancellationToken);
+
+        // If the API then rejects the save, the form is re-rendered: without this the Cover box
+        // would show the originally posted value (ModelState wins over the model) and the new
+        // upload would be silently dropped. With it, a resubmit reuses the file just stored.
+        ModelState.Remove($"{nameof(Form)}.{nameof(Form.Cover)}");
         return true;
     }
 

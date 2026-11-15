@@ -13,9 +13,11 @@ public class LogoutModel : PageModel
     {
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    // returnUrl: where to go afterwards - the layout sends the blog login page when logging out
+    // from the Blog admin, so blog users end up back on the blog-styled sign-in. Local only.
+    public async Task<IActionResult> OnPostAsync([FromForm] string? returnUrl)
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToPage("/Index");
+        return Url.IsLocalUrl(returnUrl) ? LocalRedirect(returnUrl) : RedirectToPage("/Index");
     }
 }

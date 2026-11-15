@@ -98,6 +98,9 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Daily purge of old blog view log rows (they hold readers' IP addresses).
+builder.Services.AddHostedService<ProjectA.Api.Features.Blog.Analytics.BlogViewLogRetentionService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -27,6 +27,9 @@ public sealed class BlogApiClient(HttpClient httpClient, IMemoryCache cache, ILo
     // picking up admin changes within a minute.
     private static readonly TimeSpan SiteCacheDuration = TimeSpan.FromSeconds(60);
 
+    private const string PostCacheKeyPrefix = "blog-post:";
+    private static readonly TimeSpan PostCacheDuration = TimeSpan.FromSeconds(60);
+
     public async Task<BlogSite> GetSiteAsync(CancellationToken cancellationToken = default)
     {
         if (cache.TryGetValue(SiteCacheKey, out BlogSite? cached) && cached is not null)
@@ -53,8 +56,26 @@ public sealed class BlogApiClient(HttpClient httpClient, IMemoryCache cache, ILo
     public Task<ApiResult<PostPage>> SearchAsync(string term, int page, CancellationToken cancellationToken = default) =>
         GetJsonAsync<PostPage>($"api/blog/search?term={Uri.EscapeDataString(term)}&page={page}", cancellationToken);
 
-    public Task<ApiResult<PostDetail>> GetPostAsync(string slug, CancellationToken cancellationToken = default) =>
-        GetJsonAsync<PostDetail>($"api/blog/published/{Uri.EscapeDataString(slug)}", cancellationToken);
+    // Building a post's detail is the API's most expensive public call (it ranks every published
+    // post to pick the related ones), and a popular or hammered post is requested over and over.
+    // Found posts are cached briefly - edits still appear within PostCacheDuration. Misses are
+    // not cached, so arbitrary slugs can't fill the cache.
+    public async Task<ApiResult<PostDetail>> GetPostAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        var key = PostCacheKeyPrefix + slug;
+        if (cache.TryGetValue(key, out ApiResult<PostDetail>? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var result = await GetJsonAsync<PostDetail>($"api/blog/published/{Uri.EscapeDataString(slug)}", cancellationToken);
+        if (result is { IsSuccess: true, Value: not null })
+        {
+            cache.Set(key, result, PostCacheDuration);
+        }
+
+        return result;
+    }
 
     public async Task RecordViewAsync(string slug, string? ipAddress, string? userAgent, CancellationToken cancellationToken = default)
     {

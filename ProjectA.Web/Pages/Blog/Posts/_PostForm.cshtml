@@ -6,6 +6,14 @@
 
 <form method="post" enctype="multipart/form-data" id="blog-post-form">
     <input type="hidden" asp-for="Form.PostType" />
+    @if (Model.IsPage)
+    {
+        @* Pages don't show categories or the featured switch, but a page may still carry them
+           (migrated, or created as a post and switched) - round-trip them so saving a page
+           doesn't silently clear them. *@
+        <input type="hidden" asp-for="Form.CategoriesText" />
+        <input type="hidden" asp-for="Form.IsFeatured" />
+    }
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="mb-3">

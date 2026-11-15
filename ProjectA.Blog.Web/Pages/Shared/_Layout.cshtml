@@ -13,7 +13,10 @@
     var absoluteUrl = $"{request.Scheme}://{request.Host.ToUriComponent()}{request.PathBase.ToUriComponent()}";
     var title = ViewData["Title"] as string;
     var pageTitle = title is null ? $"{site.Title} | {site.Description}" : $"{title} | {site.Title}";
-    var pageDescription = ViewData["Description"] as string ?? site.Description;
+    // Posts with no description pass "" - fall back to the blog's description then too.
+    var pageDescription = ViewData["Description"] is string description && !string.IsNullOrWhiteSpace(description)
+        ? description
+        : site.Description;
     var canonical = absoluteUrl + (ViewData["Canonical"] as string ?? string.Empty);
 }
 <!DOCTYPE html>

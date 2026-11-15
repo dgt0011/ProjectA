@@ -1,11 +1,21 @@
 ---
 
+- name: Create the unprivileged account the public blog runs as
+  user:
+    name: "{{ blogweb_user }}"
+    system: yes
+    create_home: no
+    shell: /usr/sbin/nologin
+
+# Owned by admin_user (the deploy rsyncs into blogweb_dir; ProjectA.Web writes uploads into
+# blog_storage_dir); 0755 so the blog account can read but not write either.
 - name: Create the blog app and blog storage directories
   file:
     path: "{{ item }}"
     state: directory
     owner: "{{ admin_user }}"
     group: "{{ admin_user }}"
+    mode: "0755"
   loop:
     - "{{ blogweb_dir }}"
     - "{{ blog_storage_dir }}"

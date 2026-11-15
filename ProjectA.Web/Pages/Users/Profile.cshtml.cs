@@ -42,21 +42,22 @@ public class ProfileModel(IUsersApiClient usersApiClient, BlogFileStorage blogFi
     {
         Username = User.Identity?.Name ?? string.Empty;
 
-        if (AvatarFile is not null)
+        if (AvatarFile is not null && !BlogFileStorage.IsAllowed(AvatarFile, out var error))
         {
-            if (BlogFileStorage.IsAllowed(AvatarFile, out var error))
-            {
-                Form.Avatar = await blogFileStorage.SaveAsync(AvatarFile, cancellationToken);
-            }
-            else
-            {
-                ModelState.AddModelError(nameof(AvatarFile), error);
-            }
+            ModelState.AddModelError(nameof(AvatarFile), error);
         }
 
         if (!ModelState.IsValid)
         {
             return Page();
+        }
+
+        // Saved only once the form is otherwise valid (no stray public files from rejected
+        // forms); if the API save fails, the new path stays in the Avatar box for the resubmit.
+        if (AvatarFile is not null)
+        {
+            Form.Avatar = await blogFileStorage.SaveAsync(AvatarFile, cancellationToken);
+            ModelState.Remove($"{nameof(Form)}.{nameof(Form.Avatar)}");
         }
 
         var result = await usersApiClient.UpdateProfileAsync(Form, cancellationToken);

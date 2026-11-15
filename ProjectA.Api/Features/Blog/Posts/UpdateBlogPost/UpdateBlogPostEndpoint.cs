@@ -50,20 +50,56 @@ public static class UpdateBlogPostEndpoint
         }
 
         var now = DateTime.UtcNow;
-        entity.post_type = request.PostType;
-        entity.title = request.Title.Trim();
-        entity.slug = requestedSlug;
-        entity.description = request.Description?.Trim() ?? string.Empty;
-        entity.content = request.Content ?? string.Empty;
-        entity.cover = BlogPostValidation.NullIfBlank(request.Cover);
-        entity.is_featured = request.IsFeatured;
-        entity.published_at = request.IsPublished ? entity.published_at ?? now : null;
-        entity.date_modified = now;
 
-        using var transaction = connection.BeginTransaction();
-        await connection.UpdateAsync(entity, transaction);
-        await BlogPostCategoryLinks.ReplaceAsync(connection, transaction, id, request.Categories, cancellationToken);
-        transaction.Commit();
+        // Only the editable columns are written. post_views in particular is bumped concurrently
+        // by readers, so writing back the value read above would lose any views recorded since.
+        // published_at: keep the stored date if already published (COALESCE against the row as
+        // it is now, not as read), stamp now when publishing a draft, clear when unpublishing.
+        try
+        {
+            using var transaction = connection.BeginTransaction();
+            var updated = await connection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE blog_posts SET
+                    post_type = @PostType,
+                    title = @Title,
+                    slug = @Slug,
+                    description = @Description,
+                    content = @Content,
+                    cover = @Cover,
+                    is_featured = @IsFeatured,
+                    published_at = CASE WHEN @IsPublished THEN COALESCE(published_at, @Now) ELSE NULL END,
+                    date_modified = @Now
+                WHERE id = @Id;
+                """,
+                new
+                {
+                    Id = id,
+                    PostType = request.PostType,
+                    Title = request.Title.Trim(),
+                    Slug = requestedSlug,
+                    Description = request.Description?.Trim() ?? string.Empty,
+                    Content = request.Content ?? string.Empty,
+                    Cover = BlogPostValidation.NullIfBlank(request.Cover),
+                    request.IsFeatured,
+                    request.IsPublished,
+                    Now = now
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+            if (updated == 0)
+            {
+                // Deleted since it was read above.
+                return BlogPostResponses.NotFound(id);
+            }
+
+            await BlogPostCategoryLinks.ReplaceAsync(connection, transaction, id, request.Categories, cancellationToken);
+            transaction.Commit();
+        }
+        catch (Npgsql.PostgresException ex) when (BlogSlugs.IsSlugConflict(ex))
+        {
+            return BlogSlugs.ConflictProblem(requestedSlug);
+        }
 
         return TypedResults.Ok((await BlogPostResponses.LoadAsync(connection, id, cancellationToken))!);
     }

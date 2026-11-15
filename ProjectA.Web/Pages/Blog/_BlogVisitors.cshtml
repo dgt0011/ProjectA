@@ -6,7 +6,11 @@
 }
 <p class="text-muted">
     @Model.TotalViews view@(Model.TotalViews == 1 ? "" : "s") on @Model.Day.ToString("ddd d MMM yyyy") (UTC)
-    from @Model.Visitors.Count distinct IP address / user agent combination@(Model.Visitors.Count == 1 ? "" : "s").
+    from @Model.TotalVisitors distinct IP address / user agent combination@(Model.TotalVisitors == 1 ? "" : "s").
+    @if (Model.TotalVisitors > Model.Visitors.Count)
+    {
+        <span>Showing the @Model.Visitors.Count with the most views.</span>
+    }
 </p>
 @if (Model.Visitors.Count == 0)
 {

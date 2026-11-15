@@ -62,7 +62,9 @@ public static class BlogCategoryEndpoints
         BlogCategoryRequest request, IDbConnectionFactory connectionFactory, CancellationToken cancellationToken = default)
     {
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-        var errors = await ValidateAsync(connection, request, null, cancellationToken);
+        using var transaction = connection.BeginTransaction();
+        await BlogPostCategoryLinks.LockCategoryWritesAsync(connection, transaction, cancellationToken);
+        var errors = await ValidateAsync(connection, transaction, request, null, cancellationToken);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -74,7 +76,8 @@ public static class BlogCategoryEndpoints
             description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             date_created = DateTime.UtcNow
         };
-        await connection.InsertAsync(entity);
+        await connection.InsertAsync(entity, transaction);
+        transaction.Commit();
 
         var response = (await LoadAsync(connection, entity.id, cancellationToken))!;
         return TypedResults.CreatedAtRoute(response, "GetBlogCategoryById", new { id = entity.id });
@@ -90,7 +93,9 @@ public static class BlogCategoryEndpoints
             return NotFound(id);
         }
 
-        var errors = await ValidateAsync(connection, request, id, cancellationToken);
+        using var transaction = connection.BeginTransaction();
+        await BlogPostCategoryLinks.LockCategoryWritesAsync(connection, transaction, cancellationToken);
+        var errors = await ValidateAsync(connection, transaction, request, id, cancellationToken);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -99,7 +104,8 @@ public static class BlogCategoryEndpoints
         entity.title = request.Title.Trim();
         entity.description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         entity.date_modified = DateTime.UtcNow;
-        await connection.UpdateAsync(entity);
+        await connection.UpdateAsync(entity, transaction);
+        transaction.Commit();
 
         return TypedResults.Ok((await LoadAsync(connection, id, cancellationToken))!);
     }
@@ -118,20 +124,25 @@ public static class BlogCategoryEndpoints
             $"{SelectWithCounts} WHERE c.id = @Id;", new { Id = id }, cancellationToken: cancellationToken));
 
     private static async Task<Dictionary<string, string[]>> ValidateAsync(
-        System.Data.IDbConnection connection, BlogCategoryRequest request, long? excludeId, CancellationToken cancellationToken)
+        System.Data.IDbConnection connection,
+        System.Data.IDbTransaction transaction,
+        BlogCategoryRequest request,
+        long? excludeId,
+        CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(request.Title))
         {
             errors[nameof(request.Title)] = ["Title is required."];
         }
-        else if (request.Title.Trim().Length > BlogPostCategoryLinks.MaxTitleLength)
+        else if (BlogPostCategoryLinks.ValidateTitle(request.Title.Trim()) is { } titleError)
         {
-            errors[nameof(request.Title)] = [$"Title must be {BlogPostCategoryLinks.MaxTitleLength} characters or fewer."];
+            errors[nameof(request.Title)] = [titleError];
         }
         else if (await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
                      "SELECT EXISTS (SELECT 1 FROM blog_categories WHERE LOWER(title) = LOWER(@Title) AND (@ExcludeId::bigint IS NULL OR id <> @ExcludeId));",
                      new { Title = request.Title.Trim(), ExcludeId = excludeId },
+                     transaction,
                      cancellationToken: cancellationToken)))
         {
             // Category titles are the public URL (/categories/{title}), so two that differ only

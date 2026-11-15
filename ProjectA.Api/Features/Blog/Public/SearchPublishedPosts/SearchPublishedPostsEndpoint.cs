@@ -36,7 +36,7 @@ public static class SearchPublishedPostsEndpoint
         var rows = await PublishedPosts.QueryAsync(connection, "p.post_type = 1", "", null, cancellationToken);
         var categories = await BlogPostCategoryLinks.GetForPostsAsync(connection, rows.Select(r => r.id).ToList(), cancellationToken);
 
-        var ranked = BlogSearchRanking.Rank(rows, categories, term);
+        var ranked = BlogSearchRanking.Rank(rows, categories, term, cancellationToken);
         var items = ranked
             .Skip((pageNumber - 1) * itemsPerPage)
             .Take(itemsPerPage)

@@ -101,7 +101,11 @@
         ["image"] = Model.AbsoluteCoverUrl,
         ["datePublished"] = post.PublishedAt.ToString("s"),
         ["dateModified"] = post.PublishedAt.ToString("s"),
-        ["author"] = new Dictionary<string, string> { ["@type"] = "Person", ["name"] = post.AuthorName }
+        // Authors without a display name are credited to the blog itself (the API never exposes
+        // login usernames).
+        ["author"] = string.IsNullOrWhiteSpace(post.AuthorName)
+            ? new Dictionary<string, string> { ["@type"] = "Organization", ["name"] = Model.SiteTitle }
+            : new Dictionary<string, string> { ["@type"] = "Person", ["name"] = post.AuthorName }
     }, new JsonSerializerOptions { WriteIndented = true }))
     </script>
 }

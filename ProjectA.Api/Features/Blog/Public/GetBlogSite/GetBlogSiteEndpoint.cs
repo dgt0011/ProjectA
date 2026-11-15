@@ -32,7 +32,7 @@ public static class GetBlogSiteEndpoint
             FROM blog_categories c
             JOIN blog_post_categories pc ON pc.category_id = c.id
             JOIN blog_posts p ON p.id = pc.post_id
-            WHERE {PublishedPosts.VisibleFilter}
+            WHERE {PublishedPosts.VisibleFilter} AND p.post_type = 1
             GROUP BY c.title
             ORDER BY LOWER(c.title);
             """,

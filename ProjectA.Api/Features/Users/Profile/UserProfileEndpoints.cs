@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Dapper;
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using ProjectA.Api.Data;
@@ -68,7 +69,23 @@ public static class UserProfileEndpoints
         entity.bio = Blank(request.Bio);
         entity.avatar = Blank(request.Avatar);
         entity.date_modified = DateTime.UtcNow;
-        await connection.UpdateAsync(entity);
+
+        // Only the profile columns: a whole-row update would write back the password_hash and
+        // username read above, silently undoing a password change made in the meantime.
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE users SET display_name = @DisplayName, bio = @Bio, avatar = @Avatar, date_modified = @DateModified
+            WHERE id = @Id;
+            """,
+            new
+            {
+                Id = entity.id,
+                DisplayName = entity.display_name,
+                Bio = entity.bio,
+                Avatar = entity.avatar,
+                DateModified = entity.date_modified
+            },
+            cancellationToken: cancellationToken));
 
         return TypedResults.Ok(ToResponse(entity));
     }

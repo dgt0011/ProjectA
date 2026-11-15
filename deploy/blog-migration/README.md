@@ -28,17 +28,31 @@ itself must be able to reach the Blogifier database, because the script uses
 `dblink`:
 
 ```sh
+read -rs BLOGIFIER_PASSWORD && export BLOGIFIER_PASSWORD   # prompts; nothing in shell history
 psql "host=<projecta-rds> dbname=<projecta-db> user=<master-user> sslmode=require" \
-  -v source="host=<blogifier-rds> port=5432 dbname=<blogifier-db> user=<user> password=<pw> sslmode=require" \
+  -v source_host=<blogifier-rds> -v source_db=<blogifier-db> -v source_user=<user> \
   -v author_username="<projecta username>" \
   -f deploy/blog-migration/migrate-blogifier-data.sql
+unset BLOGIFIER_PASSWORD
 ```
+
+This needs psql 15 or later. The Blogifier password is read from the
+`BLOGIFIER_PASSWORD` environment variable, so it never appears on the command line.
+Inside the database it is held only in a temporary user mapping, which is dropped before
+the script commits (or rolled back if the script fails). If RDS is set to log DDL
+(`log_statement = ddl` or `all`), turn that off for the run, or the mapping statement
+will be logged with the password.
 
 The script:
 
 - Can be re-run safely. Posts are matched by slug and categories by
   case-insensitive title, so nothing is duplicated.
 - Copies drafts as drafts.
+- If two old posts share a slug, keeps the oldest (the one readers saw) and lists
+  the others at the end instead of failing.
+- Replaces commas in category titles with " - " ("Cloud, DevOps" becomes
+  "Cloud - DevOps"), because ProjectA's editor takes categories as a comma-separated list.
+- Removes the `dblink` extension afterwards if it wasn't installed before the run.
 - Does not copy subscribers, newsletters or mail settings.
 - Ends by listing every `data/...` file path the migrated posts reference. Step 4
   needs these.

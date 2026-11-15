@@ -32,6 +32,23 @@ internal static class BlogPostCategoryLinks
         return rows.ToLookup(c => c.PostId);
     }
 
+    // Arbitrary constant key for pg_advisory_xact_lock. Category titles are unique only
+    // case-insensitively (enforced here, not by an index), so every "look up the title, insert it
+    // if missing" sequence takes this lock first; otherwise two concurrent saves could both see
+    // the title as missing and create it twice. Held until the transaction ends.
+    private const long CategoryWriteLockKey = 0x626C6F6763617473; // "blogcats"
+
+    public static Task LockCategoryWritesAsync(IDbConnection connection, IDbTransaction transaction, CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            "SELECT pg_advisory_xact_lock(@Key);", new { Key = CategoryWriteLockKey }, transaction, cancellationToken: cancellationToken));
+
+    // Null when the (trimmed) title is acceptable. Commas are not allowed because the admin
+    // editor takes a post's categories as one comma-separated list.
+    public static string? ValidateTitle(string title) =>
+        title.Length > MaxTitleLength ? $"Category names must be {MaxTitleLength} characters or fewer."
+        : title.Contains(',') ? "Category names cannot contain commas."
+        : null;
+
     public static async Task ReplaceAsync(
         IDbConnection connection,
         IDbTransaction transaction,
@@ -39,6 +56,7 @@ internal static class BlogPostCategoryLinks
         IEnumerable<string>? categoryTitles,
         CancellationToken cancellationToken)
     {
+        await LockCategoryWritesAsync(connection, transaction, cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
             "DELETE FROM blog_post_categories WHERE post_id = @PostId;",
             new { PostId = postId },
@@ -74,6 +92,7 @@ internal static class BlogPostCategoryLinks
 
     public static IEnumerable<string> Normalize(IEnumerable<string>? categoryTitles) =>
         (categoryTitles ?? [])
+            .Where(t => t is not null)
             .Select(t => t.Trim())
             .Where(t => t.Length > 0)
             .DistinctBy(t => t.ToLowerInvariant());

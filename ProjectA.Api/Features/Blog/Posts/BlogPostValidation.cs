@@ -22,6 +22,10 @@ internal static class BlogPostValidation
         {
             errors["Slug"] = ["Slug may only contain letters, numbers, '-' and '_' (max 160 characters)."];
         }
+        else if (!string.IsNullOrWhiteSpace(slug) && BlogSlugs.IsReserved(slug.Trim()))
+        {
+            errors["Slug"] = [$"'{slug.Trim()}' is reserved by the blog site's own pages; choose another slug."];
+        }
 
         if (description is { Length: > 450 })
         {
@@ -38,9 +42,13 @@ internal static class BlogPostValidation
             errors["PostType"] = ["PostType must be 1 (post) or 2 (page)."];
         }
 
-        if (BlogPostCategoryLinks.Normalize(categories).Any(c => c.Length > BlogPostCategoryLinks.MaxTitleLength))
+        if (categories?.Any(c => c is null) == true)
         {
-            errors["Categories"] = [$"Category names must be {BlogPostCategoryLinks.MaxTitleLength} characters or fewer."];
+            errors["Categories"] = ["Category names cannot be null."];
+        }
+        else if (BlogPostCategoryLinks.Normalize(categories).FirstOrDefault(c => BlogPostCategoryLinks.ValidateTitle(c) is not null) is { } bad)
+        {
+            errors["Categories"] = [BlogPostCategoryLinks.ValidateTitle(bad)!];
         }
 
         return errors;

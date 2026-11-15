@@ -22,6 +22,10 @@
             placeholder: 'Write the post in Markdown...',
             uploadImage: true,
             imageUploadEndpoint: '@Url.Page("/Blog/Upload")',
+            // Without this EasyMDE prefixes the returned "/data/..." path with this admin site's
+            // origin plus a "/" (https://projects...//data/...), which breaks on the public blog.
+            // The site-relative path is what the public blog serves.
+            imagePathAbsolute: true,
             imageCSRFName: '@tokens.FormFieldName',
             imageCSRFToken: '@tokens.RequestToken',
             imageMaxSize: @ProjectA.Web.Common.BlogFileStorage.MaxFileBytes,

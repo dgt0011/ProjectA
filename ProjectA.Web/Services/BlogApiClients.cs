@@ -77,6 +77,8 @@ public sealed class BlogCategoriesApiClient(HttpClient httpClient) : ApiClientBa
 // dashboard's analytics.
 public interface IBlogAdminApiClient
 {
+    // Anonymous (GET /api/blog/site) - usable before sign-in, e.g. by the blog login page.
+    Task<ApiResult<BlogSiteDto>> GetSiteAsync(CancellationToken cancellationToken = default);
     Task<ApiResult<BlogSettingsDto>> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<ApiResult<BlogSettingsDto>> UpdateSettingsAsync(BlogSettingsInput input, CancellationToken cancellationToken = default);
     Task<ApiResult<BlogAnalyticsDto>> GetAnalyticsAsync(int latest, CancellationToken cancellationToken = default);
@@ -86,6 +88,9 @@ public interface IBlogAdminApiClient
 
 public sealed class BlogAdminApiClient(HttpClient httpClient) : ApiClientBase(httpClient), IBlogAdminApiClient
 {
+    public Task<ApiResult<BlogSiteDto>> GetSiteAsync(CancellationToken cancellationToken = default) =>
+        GetJsonAsync<BlogSiteDto>("api/blog/site", cancellationToken);
+
     public Task<ApiResult<BlogSettingsDto>> GetSettingsAsync(CancellationToken cancellationToken = default) =>
         GetJsonAsync<BlogSettingsDto>("api/blog/settings", cancellationToken);
 

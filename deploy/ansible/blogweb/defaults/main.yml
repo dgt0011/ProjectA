@@ -15,3 +15,10 @@ blogweb_port: 5240
 # /data and ProjectA.Web's Blog admin writes uploads into it - both apps' appsettings.Production.json
 # point BlogStorage:RootPath here.
 blog_storage_dir: /mnt/data/blog-storage
+
+# Unprivileged system account the public blog runs as. It is the one service on the host that
+# takes anonymous internet traffic, so unlike web/api it does not run as admin_user (which has
+# passwordless sudo and owns every app's binaries). It only needs to read: blogweb_dir and
+# blog_storage_dir stay owned by admin_user (deploys and admin uploads write there) and are
+# world-readable.
+blogweb_user: projecta-blog

@@ -20,7 +20,8 @@ public static class GetBlogDailyViewsEndpoint
             .WithDescription(
                 "Views per UTC day for the last 'days' days (default 30, max 365) including today, " +
                 "zero-filled, oldest first. 'postId' narrows it to one post or page; without it the " +
-                "whole blog is counted. Also lists every published post and page with its views in " +
+                "whole blog is counted. Also lists every published post and page (plus any unpublished one " +
+                "with views in the period) with its views in " +
                 "the same period (most viewed first) so callers can offer a post picker.");
 
         group.MapGet("daily/{day}", HandleVisitors)
@@ -28,7 +29,8 @@ public static class GetBlogDailyViewsEndpoint
             .WithSummary("Who viewed the blog on one day")
             .WithDescription(
                 "The views of one UTC day ('yyyy-MM-dd') grouped by IP address and user agent, most " +
-                "views first (at most 500 groups). 'postId' narrows it to one post or page.");
+                "views first (at most 500 groups; TotalViews and TotalVisitors count the whole day). " +
+                "'postId' narrows it to one post or page.");
     }
 
     private static async Task<Ok<DailyViewsResponse>> HandleDaily(
@@ -74,8 +76,10 @@ public static class GetBlogDailyViewsEndpoint
             FROM blog_posts p
             LEFT JOIN blog_post_views v
                    ON v.post_id = p.id AND v.viewed_at >= @FromUtc AND v.viewed_at < @ToUtc
-            WHERE p.published_at IS NOT NULL
             GROUP BY p.id, p.title, p.post_type
+            -- Published posts, plus any post (e.g. since unpublished) whose views are in the
+            -- daily series, so the per-post totals always add up to the chart.
+            HAVING bool_or(p.published_at IS NOT NULL) OR COUNT(v.id) > 0
             ORDER BY Views DESC, p.title;
             """,
             range,
@@ -92,7 +96,20 @@ public static class GetBlogDailyViewsEndpoint
         IDbConnectionFactory connectionFactory,
         CancellationToken cancellationToken = default)
     {
+        var range = new { FromUtc = ToUtc(day), ToUtc = ToUtc(day.AddDays(1)), PostId = postId, Limit = MaxVisitors };
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Counted separately: the visitor list below is capped, so summing it could undercount.
+        var totals = await connection.QuerySingleAsync<(int TotalViews, int TotalVisitors)>(new CommandDefinition(
+            """
+            SELECT COUNT(*)::int, COUNT(DISTINCT COALESCE(host(ip_address), '') || E'\n' || COALESCE(user_agent, ''))::int
+            FROM blog_post_views
+            WHERE viewed_at >= @FromUtc AND viewed_at < @ToUtc
+              AND (CAST(@PostId AS bigint) IS NULL OR post_id = @PostId);
+            """,
+            range,
+            cancellationToken: cancellationToken));
+
         var visitors = (await connection.QueryAsync<Visitor>(new CommandDefinition(
             """
             SELECT host(v.ip_address) AS IpAddress,
@@ -109,10 +126,10 @@ public static class GetBlogDailyViewsEndpoint
             ORDER BY Views DESC, LastViewedAt DESC
             LIMIT @Limit;
             """,
-            new { FromUtc = ToUtc(day), ToUtc = ToUtc(day.AddDays(1)), PostId = postId, Limit = MaxVisitors },
+            range,
             cancellationToken: cancellationToken))).ToList();
 
-        return TypedResults.Ok(new DailyVisitorsResponse(postId, day, visitors.Sum(v => v.Views), visitors));
+        return TypedResults.Ok(new DailyVisitorsResponse(postId, day, totals.TotalViews, totals.TotalVisitors, visitors));
     }
 
     private static DateTime ToUtc(DateOnly day) => DateTime.SpecifyKind(day.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
@@ -144,5 +161,7 @@ public static class GetBlogDailyViewsEndpoint
         long? PostId,
         DateOnly Day,
         int TotalViews,
+        // Distinct IP address + user agent combinations; Visitors holds at most 500 of them.
+        int TotalVisitors,
         IReadOnlyList<Visitor> Visitors);
 }

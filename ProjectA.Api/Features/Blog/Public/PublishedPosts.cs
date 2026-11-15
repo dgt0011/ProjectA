@@ -1,5 +1,4 @@
 using System.Data;
-using System.Text.RegularExpressions;
 using Dapper;
 
 namespace ProjectA.Api.Features.Blog.Public;
@@ -39,7 +38,11 @@ public sealed record PublishedPostPage(
 
 internal static class PublishedPosts
 {
-    public static int NormalizePage(int? page) => page is null or < 1 ? 1 : page.Value;
+    // Far beyond any real page count, and small enough that (page - 1) * itemsPerPage (at most
+    // 100 per page) can't overflow an int and turn into a negative OFFSET.
+    public const int MaxPage = 100_000;
+
+    public static int NormalizePage(int? page) => page is null or < 1 ? 1 : Math.Min(page.Value, MaxPage);
 
     public static async Task<int> GetItemsPerPageAsync(IDbConnection connection, CancellationToken cancellationToken)
     {
@@ -60,7 +63,9 @@ internal static class PublishedPosts
         """
         SELECT p.id, p.post_type, p.title, p.slug, p.description, p.content, p.cover,
                p.published_at, p.is_featured, p.post_views,
-               COALESCE(NULLIF(u.display_name, ''), u.username, '') AS author_name,
+               -- Display name only: never fall back to the login username, which would publish
+               -- half of an admin login on every post. Blog.Web shows the blog instead.
+               COALESCE(NULLIF(btrim(u.display_name), ''), '') AS author_name,
                u.avatar AS author_avatar
         FROM blog_posts p
         LEFT JOIN users u ON u.id = p.author_id
@@ -125,16 +130,30 @@ internal static class PublishedPosts
 // posts" come back in the same order readers are used to: category name match = 10,
 // each title hit = 10, description hit = 3, content hit = 1. Terms shorter than 4 characters
 // only count until something has already matched, which stops "a"/"the" dominating.
+//
+// The search box is anonymous, so the work per request is bounded: only the first MaxTerms
+// distinct words of the first MaxTermLength characters are used, and matches are counted with an
+// ordinal IndexOf scan (no per-term Regex construction).
 internal static class BlogSearchRanking
 {
+    public const int MaxTermLength = 200;
+    public const int MaxTerms = 10;
+
     public static List<(PublishedPosts.Row Row, int Rank)> Rank(
         IEnumerable<PublishedPosts.Row> rows,
         ILookup<long, BlogPostCategoryLinks.PostCategory> categories,
-        string term)
+        string term,
+        CancellationToken cancellationToken = default)
     {
+        if (term.Length > MaxTermLength)
+        {
+            term = term[..MaxTermLength];
+        }
+
         var terms = term.ToLowerInvariant()
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct()
+            .Take(MaxTerms)
             .ToList();
 
         var results = new List<(PublishedPosts.Row, int)>();
@@ -145,6 +164,7 @@ internal static class BlogSearchRanking
 
         foreach (var row in rows)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var rank = 0;
             var title = row.title.ToLowerInvariant();
             var description = row.description.ToLowerInvariant();
@@ -176,6 +196,17 @@ internal static class BlogSearchRanking
             .ToList();
     }
 
-    private static int CountOccurrences(string haystack, string needle) =>
-        haystack.Length == 0 ? 0 : Regex.Matches(haystack, Regex.Escape(needle)).Count;
+    // Non-overlapping occurrences - the same count Regex.Matches gave for an escaped literal.
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var index = haystack.IndexOf(needle, StringComparison.Ordinal);
+             index >= 0;
+             index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
+    }
 }

@@ -32,6 +32,31 @@ internal static partial class BlogSlugs
     public static bool IsValid(string slug) =>
         !string.IsNullOrWhiteSpace(slug) && slug.Length <= MaxLength && ValidSlug().IsMatch(slug);
 
+    // Pages are served by ProjectA.Blog.Web at /{slug}, but its fixed routes and static folders
+    // win over that catch-all, so a page with one of these slugs could never be reached ("posts"
+    // even redirected to itself forever). Posts live under /posts/ and wouldn't clash, but a
+    // post can be turned into a page, so the names are reserved for both.
+    private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "posts", "categories", "search", "feed", "sitemap", "error", "admin", "data", "img", "themes"
+    };
+
+    public static bool IsReserved(string slug) => Reserved.Contains(slug);
+
+    // The slug existence checks run before the write, so a concurrent save can still take the
+    // slug in between; the unique index then rejects the write and this turns that into the
+    // same validation problem the check would have returned.
+    public const string SlugIndexName = "idx_blog_posts_slug";
+
+    public static bool IsSlugConflict(Npgsql.PostgresException ex) =>
+        ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation && ex.ConstraintName == SlugIndexName;
+
+    public static Microsoft.AspNetCore.Http.HttpResults.ValidationProblem ConflictProblem(string slug) =>
+        Microsoft.AspNetCore.Http.TypedResults.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["Slug"] = [$"The slug '{slug}' is already used by another post."]
+        });
+
     // Appends 2, 3, ... (as Blogifier did) until the slug is free. excludePostId lets an edit
     // keep its own slug without it counting as a clash.
     public static async Task<string> MakeUniqueAsync(
@@ -43,7 +68,9 @@ internal static partial class BlogSlugs
         }
 
         var candidate = baseSlug;
-        for (var suffix = 2; await ExistsAsync(connection, candidate, excludePostId, cancellationToken); suffix++)
+        for (var suffix = 2;
+             IsReserved(candidate) || await ExistsAsync(connection, candidate, excludePostId, cancellationToken);
+             suffix++)
         {
             var suffixText = suffix.ToString(CultureInfo.InvariantCulture);
             var stem = baseSlug.Length + suffixText.Length > MaxLength

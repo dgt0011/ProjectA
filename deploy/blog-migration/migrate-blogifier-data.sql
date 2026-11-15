@@ -4,14 +4,25 @@
 -- Run against the *ProjectA* database, after ProjectA.Api has started at least once (so DbUp
 -- has applied script014-CreateTables-Blog.sql). Reads the Blogifier database over dblink:
 --
+--   read -rs BLOGIFIER_PASSWORD && export BLOGIFIER_PASSWORD     # prompt; keeps it out of history
 --   psql "<ProjectA connection string>" \
---     -v source="host=<blogifier-rds-host> port=5432 dbname=<blogifier-db> user=<user> password=<pw> sslmode=require" \
+--     -v source_host=<blogifier-rds-host> -v source_db=<blogifier-db> -v source_user=<user> \
 --     -v author_username="<ProjectA username that becomes the author of every migrated post>" \
 --     -f migrate-blogifier-data.sql
+--   unset BLOGIFIER_PASSWORD
+--
+-- Needs psql 15+ (\getenv). The Blogifier password is read from the BLOGIFIER_PASSWORD
+-- environment variable - never put on the command line - and is only ever sent to the server in
+-- one CREATE USER MAPPING statement inside the migration transaction. The mapping (and the
+-- foreign server) are dropped before COMMIT, and a failed run rolls them back, so the password
+-- is never left stored in the database and never appears in the dblink queries (which would
+-- otherwise copy it into pg_stat_activity and any error-log STATEMENT lines). If the server
+-- logs DDL (log_statement = ddl/all), turn that off for the run or the mapping will be logged.
 --
 -- The ProjectA database server must be able to reach the Blogifier database (same RDS
 -- instance, or a security group rule allowing the ProjectA RDS instance to connect out to it).
 -- On RDS the dblink extension is available; creating it needs rds_superuser (the master user).
+-- If this script had to create the extension, it drops it again at the end.
 --
 -- Safe to re-run: categories are matched by (case-insensitive) title and posts by slug, so
 -- anything already copied is skipped rather than duplicated. Blog settings and the author's
@@ -23,9 +34,37 @@
 
 \set ON_ERROR_STOP on
 
-CREATE EXTENSION IF NOT EXISTS dblink;
+\getenv source_password BLOGIFIER_PASSWORD
+\if :{?source_password}
+\else
+    \echo 'Set the BLOGIFIER_PASSWORD environment variable (see the header of this script).'
+    \quit
+\endif
+
+-- Optional: -v source_sslmode=... (defaults to require) and -v source_port=... (defaults to 5432).
+\if :{?source_sslmode}
+\else
+    \set source_sslmode require
+\endif
+\if :{?source_port}
+\else
+    \set source_port 5432
+\endif
+
+SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'dblink') AS created_dblink \gset
 
 BEGIN;
+
+CREATE EXTENSION IF NOT EXISTS dblink;
+
+-- Connection details for the dblink calls below, as a foreign server + user mapping, so the
+-- password isn't embedded in every dblink() query. Both are dropped before COMMIT.
+CREATE SERVER blogmig_source FOREIGN DATA WRAPPER dblink_fdw
+    OPTIONS (host :'source_host', port :'source_port', dbname :'source_db', sslmode :'source_sslmode');
+CREATE USER MAPPING FOR CURRENT_USER SERVER blogmig_source
+    OPTIONS (user :'source_user', password :'source_password');
+\unset source_password
+\set source blogmig_source
 
 SELECT set_config('blogmig.author_username', :'author_username', true);
 
@@ -105,15 +144,31 @@ FROM (SELECT * FROM src_authors ORDER BY post_count DESC, id LIMIT 1) a
 WHERE LOWER(u.username) = LOWER(current_setting('blogmig.author_username'));
 
 -- ---------------------------------------------------------------------------------------------
--- 4. Categories, matched case-insensitively by title.
+-- 4. Categories, matched case-insensitively by title. ProjectA doesn't allow commas in
+--    category titles (the editor takes categories as a comma-separated list), so they become
+--    " - " ("Cloud, DevOps" -> "Cloud - DevOps"); step 6 matches on the same cleaned title.
 -- ---------------------------------------------------------------------------------------------
+UPDATE src_categories SET title = LEFT(btrim(regexp_replace(title, '\s*,\s*', ' - ', 'g')), 120);
+
 INSERT INTO blog_categories (title, description, date_created, date_modified)
 SELECT DISTINCT ON (LOWER(c.title))
-       LEFT(c.title, 120), LEFT(NULLIF(c.description, ''), 255),
+       c.title, LEFT(NULLIF(c.description, ''), 255),
        c.date_created AT TIME ZONE 'UTC', c.date_updated AT TIME ZONE 'UTC'
 FROM src_categories c
 WHERE NOT EXISTS (SELECT 1 FROM blog_categories t WHERE LOWER(t.title) = LOWER(c.title))
 ORDER BY LOWER(c.title), c.id;
+
+-- ---------------------------------------------------------------------------------------------
+-- 5a. blog_posts.slug is unique, but Blogifier's "Slug" column wasn't. If two source posts share
+--     a slug, keep the oldest (lowest Id - the one Blogifier's slug lookup returned, so the one
+--     readers actually saw) instead of aborting the whole copy; the others are listed at the end.
+-- ---------------------------------------------------------------------------------------------
+CREATE TEMP TABLE src_posts_skipped ON COMMIT DROP AS
+SELECT p.id, p.slug, p.title
+FROM src_posts p
+WHERE EXISTS (SELECT 1 FROM src_posts o WHERE o.slug = p.slug AND o.id < p.id);
+
+DELETE FROM src_posts p USING src_posts_skipped s WHERE p.id = s.id;
 
 -- ---------------------------------------------------------------------------------------------
 -- 5. Posts and pages, matched by slug. Published <= year 1900 is Blogifier's draft marker
@@ -153,11 +208,15 @@ ON CONFLICT DO NOTHING;
 -- ---------------------------------------------------------------------------------------------
 -- 7. Summary.
 -- ---------------------------------------------------------------------------------------------
-SELECT 'source posts' AS item, COUNT(*) AS count FROM src_posts
+SELECT 'source posts copied or already present' AS item, COUNT(*) AS count FROM src_posts
+UNION ALL SELECT 'source posts skipped (duplicate slug)', COUNT(*) FROM src_posts_skipped
 UNION ALL SELECT 'blog_posts now', COUNT(*) FROM blog_posts
 UNION ALL SELECT 'source categories', COUNT(*) FROM src_categories
 UNION ALL SELECT 'blog_categories now', COUNT(*) FROM blog_categories
 UNION ALL SELECT 'blog_post_categories now', COUNT(*) FROM blog_post_categories;
+
+-- Duplicate-slug posts that were not copied (empty when there were none).
+SELECT id AS skipped_blogifier_post_id, slug, title FROM src_posts_skipped ORDER BY slug, id;
 
 -- Every local image/file path the migrated content references - each must exist under the
 -- blog storage folder (BlogStorage:RootPath) for the site to render completely. Absolute
@@ -172,4 +231,12 @@ FROM (
 ) refs
 ORDER BY 1;
 
+DROP USER MAPPING FOR CURRENT_USER SERVER blogmig_source;
+DROP SERVER blogmig_source;
+
 COMMIT;
+
+-- dblink was only needed for this run; leave it installed only if it already was.
+\if :created_dblink
+DROP EXTENSION IF EXISTS dblink;
+\endif

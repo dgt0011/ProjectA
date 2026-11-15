@@ -8,6 +8,8 @@ namespace ProjectA.Blog.Web.Pages;
 
 public class SearchModel(IBlogApiClient blogApi) : PageModel
 {
+    private const int MaxTermLength = 200;
+
     [BindProperty(SupportsGet = true)]
     public string? Term { get; set; }
 
@@ -17,6 +19,13 @@ public class SearchModel(IBlogApiClient blogApi) : PageModel
     {
         var pageNumber = page is > 0 ? page.Value : 1;
         var site = await blogApi.GetSiteAsync(cancellationToken);
+
+        // The API only uses the first 200 characters (and first 10 words) anyway; trimming here
+        // keeps oversized terms out of the API call and the pagination links.
+        if (Term is { Length: > MaxTermLength })
+        {
+            Term = Term[..MaxTermLength];
+        }
         var results = PostPage.Empty;
 
         if (!string.IsNullOrWhiteSpace(Term))
