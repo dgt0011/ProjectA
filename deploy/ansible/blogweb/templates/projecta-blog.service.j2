@@ -1,0 +1,17 @@
+[Unit]
+Description=ProjectA.Blog.Web (public blog)
+After=network.target mnt-data.mount
+
+[Service]
+Type=simple
+User={{ admin_user }}
+Group={{ admin_user }}
+WorkingDirectory={{ blogweb_dir }}
+ExecStart={{ blogweb_dir }}/{{ blogweb_executable }}
+Restart=on-failure
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:{{ blogweb_port }}
+
+[Install]
+WantedBy=multi-user.target

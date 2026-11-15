@@ -15,6 +15,7 @@ on:
     branches: [main]
     paths:
       - ProjectA.Api/**
+      - ProjectA.Api.Schema/**
       - .github/workflows/deploy-api-projecta.yml
   workflow_dispatch:
     inputs:

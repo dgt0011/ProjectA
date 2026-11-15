@@ -1,0 +1,11 @@
+@page "/search"
+@model SearchModel
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Term) ? "Search" : Model.Term;
+    ViewData["Canonical"] = "/search";
+}
+
+<main class="container">
+    <h1 class="h3 mb-5">search: <strong>@Model.Term</strong></h1>
+    <partial name="_PostList" model="Model.List" />
+</main>

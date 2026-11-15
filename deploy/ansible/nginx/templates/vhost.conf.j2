@@ -2,7 +2,7 @@ server {
     listen 80;
     listen [::]:80;
 
-    server_name {{ nginx_server_name }};
+    server_name {{ nginx_server_name }}{% for alias in nginx_server_aliases %} {{ alias }}{% endfor %};
 
     # permit large file uploads for this site
     client_max_body_size 100M;

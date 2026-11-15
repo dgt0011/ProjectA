@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.FileProviders;
+using ProjectA.Web.Common;
 using ProjectA.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -91,6 +93,21 @@ builder.Services.AddHttpClient<IUsersApiClient, UsersApiClient>(client =>
     client.BaseAddress = new Uri(apiBaseUrl);
 }).AddHttpMessageHandler<BearerTokenHandler>();
 
+// Blog admin (migrated from Blogifier's Blazor admin) - same pattern as the clients above.
+builder.Services.AddHttpClient<IBlogPostsApiClient, BlogPostsApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+}).AddHttpMessageHandler<BearerTokenHandler>();
+builder.Services.AddHttpClient<IBlogCategoriesApiClient, BlogCategoriesApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+}).AddHttpMessageHandler<BearerTokenHandler>();
+builder.Services.AddHttpClient<IBlogAdminApiClient, BlogAdminApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+}).AddHttpMessageHandler<BearerTokenHandler>();
+builder.Services.AddSingleton<BlogFileStorage>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -101,6 +118,16 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// Serve the shared blog upload folder at /data (the same path ProjectA.Blog.Web serves it on),
+// so images in blog post previews and the editor resolve here exactly as on the public blog.
+var blogStorageRoot = app.Services.GetRequiredService<BlogFileStorage>().RootPath;
+Directory.CreateDirectory(blogStorageRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(blogStorageRoot),
+    RequestPath = BlogFileStorage.RequestPath
+});
 
 app.UseRouting();
 

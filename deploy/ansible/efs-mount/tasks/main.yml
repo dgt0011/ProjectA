@@ -22,6 +22,13 @@
     owner: "{{ admin_user }}"
     group: "{{ admin_user }}"
 
+- name: create the /mnt/data/blog-storage directory (blog uploads, shared by ProjectA.Web and ProjectA.Blog.Web)
+  file: 
+    path: /mnt/data/blog-storage
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+
 - name: create the /mnt/data/api directory
   file: 
     path: /mnt/data/api

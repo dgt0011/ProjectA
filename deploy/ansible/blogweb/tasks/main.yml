@@ -1,0 +1,44 @@
+---
+
+- name: Create the blog app and blog storage directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+  loop:
+    - "{{ blogweb_dir }}"
+    - "{{ blog_storage_dir }}"
+
+- name: Deploy the projecta-blog systemd unit
+  template:
+    src: projecta-blog.service.j2
+    dest: /etc/systemd/system/projecta-blog.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: blogweb_unit
+  notify: restart projecta-blog
+
+- name: Reload systemd if the unit file changed
+  systemd:
+    daemon_reload: yes
+  when: blogweb_unit.changed
+
+# Same pattern as the webapp role: enable now, but only start once
+# deploy-blog-web-projecta.yml has actually copied the app into place.
+- name: Check whether the blog app has been deployed yet
+  stat:
+    path: "{{ blogweb_dir }}/{{ blogweb_executable }}"
+  register: blogweb_binary
+
+- name: Ensure the projecta-blog service is enabled on boot
+  service:
+    name: projecta-blog
+    enabled: yes
+
+- name: Start the projecta-blog service if the app has already been deployed
+  service:
+    name: projecta-blog
+    state: started
+  when: blogweb_binary.stat.exists

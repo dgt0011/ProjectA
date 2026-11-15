@@ -1,0 +1,113 @@
+@page
+@model ProjectA.Web.Pages.Blog.Posts.IndexModel
+@{
+    ViewData["Title"] = Model.IsPages ? "Blog pages" : "Blog posts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Blog</h1>
+    <a asp-page="Create" asp-route-type="@Model.Type" class="btn btn-primary">New @Model.Noun</a>
+</div>
+
+<partial name="_BlogNav" model="@(Model.IsPages ? "Pages" : "Posts")" />
+
+<form method="get" class="row g-2 align-items-center mb-3">
+    <input type="hidden" name="type" value="@Model.Type" />
+    <div class="col-auto">
+        <div class="btn-group" role="group" aria-label="Filter">
+            @foreach (var status in IndexModel.Statuses)
+            {
+                <a asp-page="Index" asp-route-type="@Model.Type" asp-route-status="@status" asp-route-term="@Model.Term"
+                   class="btn btn-sm @(status == Model.Status ? "btn-secondary" : "btn-outline-secondary") text-capitalize">@status</a>
+            }
+        </div>
+    </div>
+    <div class="col-auto ms-auto">
+        <input type="hidden" name="status" value="@Model.Status" />
+        <input type="search" name="term" value="@Model.Term" class="form-control form-control-sm" placeholder="Search titles..." />
+    </div>
+</form>
+
+@if (!Model.LoadedSuccessfully)
+{
+    <div class="alert alert-warning">Could not load blog @(Model.Noun)s from the API.</div>
+}
+else if (Model.Posts.Count == 0)
+{
+    <p class="text-muted">No @(Model.Noun)s found.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                @if (!Model.IsPages)
+                {
+                    <th>Categories</th>
+                }
+                <th class="text-end">Views</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var post in Model.Posts)
+            {
+                <tr>
+                    <td>
+                        <a asp-page="Edit" asp-route-id="@post.Id">@post.Title</a>
+                        @if (post.IsFeatured)
+                        {
+                            <span class="badge bg-info ms-1">Featured</span>
+                        }
+                        <div class="small text-muted">/@(Model.IsPages ? "" : "posts/")@post.Slug</div>
+                    </td>
+                    <td>
+                        @if (post.PublishedAt is { } published)
+                        {
+                            <span class="badge bg-success">Published</span>
+                            <div class="small text-muted">@published.ToLocalTime().ToString("d MMM yyyy")</div>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Draft</span>
+                        }
+                    </td>
+                    @if (!Model.IsPages)
+                    {
+                        <td class="small">@string.Join(", ", post.Categories)</td>
+                    }
+                    <td class="text-end">@post.PostViews</td>
+                    <td class="text-end text-nowrap">
+                        @if (post.PublishedAt is not null && !string.IsNullOrWhiteSpace(Model.BlogSiteUrl))
+                        {
+                            <a href="@Model.PublicUrl(post)" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">View</a>
+                        }
+                        else
+                        {
+                            <a asp-page="Preview" asp-route-id="@post.Id" class="btn btn-sm btn-outline-secondary">Preview</a>
+                        }
+                        <a asp-page="Edit" asp-route-id="@post.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" class="d-inline" asp-page-handler="Publish" asp-route-id="@post.Id" asp-route-value="@(post.PublishedAt is null)"
+                              asp-route-type="@Model.Type" asp-route-status="@Model.Status" asp-route-term="@Model.Term">
+                            <button type="submit" class="btn btn-sm btn-outline-success">@(post.PublishedAt is null ? "Publish" : "Unpublish")</button>
+                        </form>
+                        @if (!Model.IsPages)
+                        {
+                            <form method="post" class="d-inline" asp-page-handler="Feature" asp-route-id="@post.Id" asp-route-value="@(!post.IsFeatured)"
+                                  asp-route-type="@Model.Type" asp-route-status="@Model.Status" asp-route-term="@Model.Term">
+                                <button type="submit" class="btn btn-sm btn-outline-info">@(post.IsFeatured ? "Unfeature" : "Feature")</button>
+                            </form>
+                        }
+                        <form method="post" class="d-inline" asp-page-handler="Delete" asp-route-id="@post.Id"
+                              asp-route-type="@Model.Type" asp-route-status="@Model.Status" asp-route-term="@Model.Term"
+                              onsubmit="return confirm('Delete this @Model.Noun? This cannot be undone.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

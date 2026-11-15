@@ -2,7 +2,7 @@ server {
     listen 80;
     listen [::]:80;
 
-    server_name {{ letsencrypt_domain }};
+    server_name {{ letsencrypt_domain }}{% for domain in letsencrypt_extra_domains %} {{ domain }}{% endfor %};
 
     # Kept on port 80 (rather than removed) so certbot's --nginx authenticator
     # has a server block to work with on every renewal, and so any plain-HTTP
@@ -16,7 +16,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
 
-    server_name {{ letsencrypt_domain }};
+    server_name {{ letsencrypt_domain }}{% for domain in letsencrypt_extra_domains %} {{ domain }}{% endfor %};
 
     ssl_certificate     /etc/letsencrypt/live/{{ letsencrypt_domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ letsencrypt_domain }}/privkey.pem;

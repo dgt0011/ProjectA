@@ -25,6 +25,7 @@
   command: >
     certbot certonly --nginx
     -d {{ letsencrypt_domain }}
+    {% for domain in letsencrypt_extra_domains %}-d {{ domain }} {% endfor %}
     -m {{ letsencrypt_email }}
     --agree-tos
     --non-interactive

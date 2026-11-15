@@ -9,6 +9,17 @@
     admin_user: admin
     efs_dns_name: fs-0bf11378f69336002.efs.ap-southeast-2.amazonaws.com
 
+    # Public blog (ProjectA.Blog.Web, replacing the Blogifier ECS service).
+    # blog_site_enabled installs the service and an HTTP nginx vhost for the blog hostnames.
+    # blog_tls_enabled requests the Let's Encrypt certificate - only turn it on AFTER the
+    # darrentuer.net / www.darrentuer.net DNS records point at this instance, otherwise
+    # certbot's HTTP-01 challenge fails (and fails the play).
+    blog_site_enabled: true
+    blog_tls_enabled: false
+    blog_server_name: www.darrentuer.net
+    blog_server_aliases:
+      - darrentuer.net
+
   roles:
     - core
     - applications
@@ -18,6 +29,22 @@
     - efs-mount
     - webapp
     - webapi
+    - role: blogweb
+      when: blog_site_enabled | bool
     - nginx
     - letsencrypt
+    - role: nginx
+      vars:
+        nginx_server_name: "{{ blog_server_name }}"
+        nginx_server_aliases: "{{ blog_server_aliases }}"
+        nginx_upstream_port: 5240
+      when: blog_site_enabled | bool
+    - role: letsencrypt
+      vars:
+        nginx_server_name: "{{ blog_server_name }}"
+        nginx_server_aliases: "{{ blog_server_aliases }}"
+        nginx_upstream_port: 5240
+        letsencrypt_domain: "{{ blog_server_name }}"
+        letsencrypt_extra_domains: "{{ blog_server_aliases }}"
+      when: blog_site_enabled | bool and blog_tls_enabled | bool
     - fail2ban

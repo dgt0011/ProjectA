@@ -6,6 +6,7 @@ using ProjectA.Api.Data;
 using ProjectA.Api.Features.Attachments;
 using ProjectA.Api.Features.AttachmentTypes;
 using ProjectA.Api.Features.Auth;
+using ProjectA.Api.Features.Blog;
 using ProjectA.Api.Features.Bookmarks;
 using ProjectA.Api.Features.BookmarkTypes;
 using ProjectA.Api.Features.Categories;
@@ -138,6 +139,7 @@ app.MapAttachmentTypeEndpoints();
 app.MapProjectEndpoints();
 app.MapAuthEndpoints();
 app.MapUserEndpoints();
+app.MapBlogEndpoints();
 
 await SeedAdminUserIfNoneExistAsync(app.Services, app.Configuration, app.Logger);
 

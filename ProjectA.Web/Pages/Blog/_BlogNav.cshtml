@@ -1,0 +1,22 @@
+@model string
+@* Sub-navigation shared by every Blog admin page (Blogifier's admin sidebar). The model is
+   the name of the active tab. A null Type renders no ?type= route value at all. *@
+@{
+    var tabs = new (string Name, string Page, string? Type)[]
+    {
+        ("Dashboard", "/Blog/Index", null),
+        ("Posts", "/Blog/Posts/Index", BlogPostType.Post.ToString()),
+        ("Pages", "/Blog/Posts/Index", BlogPostType.Page.ToString()),
+        ("Categories", "/Blog/Categories/Index", null),
+        ("Settings", "/Blog/Settings", null),
+        ("Author profile", "/Users/Profile", null)
+    };
+}
+<ul class="nav nav-tabs mb-4">
+    @foreach (var tab in tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(tab.Name == Model ? "active" : "")" asp-page="@tab.Page" asp-route-type="@tab.Type">@tab.Name</a>
+        </li>
+    }
+</ul>

@@ -1,0 +1,30 @@
+@page "{id:long}"
+@model ProjectA.Web.Pages.Blog.Posts.PreviewModel
+@{
+    ViewData["Title"] = $"Preview: {Model.Post.Title}";
+    var cover = Model.Post.Cover;
+    if (!string.IsNullOrWhiteSpace(cover) && !cover.StartsWith("http") && !cover.StartsWith("/"))
+    {
+        cover = "/" + cover;
+    }
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <span class="badge @(Model.Post.PublishedAt is null ? "bg-secondary" : "bg-success")">@(Model.Post.PublishedAt is null ? "Draft" : "Published")</span>
+    <a asp-page="Edit" asp-route-id="@Model.Post.Id" class="btn btn-primary">Edit</a>
+</div>
+
+<article class="col-lg-9 mx-auto">
+    @if (!string.IsNullOrWhiteSpace(cover))
+    {
+        <img src="@cover" alt="" class="img-fluid rounded mb-4" />
+    }
+    <h1>@Model.Post.Title</h1>
+    <p class="lead text-muted">@Model.Post.Description</p>
+    <textarea id="note-body-raw" hidden>@Model.Post.Content</textarea>
+    <div id="note-body-rendered"></div>
+</article>
+
+@section Scripts {
+    <partial name="/Pages/Notes/_MarkdownViewerScripts.cshtml" />
+}

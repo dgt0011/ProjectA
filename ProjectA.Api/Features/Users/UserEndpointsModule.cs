@@ -3,6 +3,7 @@ using ProjectA.Api.Features.Users.CreateUser;
 using ProjectA.Api.Features.Users.DeleteUser;
 using ProjectA.Api.Features.Users.GetUserById;
 using ProjectA.Api.Features.Users.GetUserList;
+using ProjectA.Api.Features.Users.Profile;
 
 namespace ProjectA.Api.Features.Users;
 
@@ -22,5 +23,6 @@ public static class UserEndpointsModule
         group.MapCreateUser();
         group.MapDeleteUser();
         group.MapChangePassword();
+        group.MapUserProfile();
     }
 }

@@ -1,0 +1,85 @@
+@page
+@model ProjectA.Web.Pages.Blog.IndexModel
+@{
+    ViewData["Title"] = "Blog";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Blog</h1>
+    @if (!string.IsNullOrWhiteSpace(Model.BlogSiteUrl))
+    {
+        <a href="@Model.BlogSiteUrl" target="_blank" rel="noopener" class="btn btn-outline-light">View blog</a>
+    }
+</div>
+
+<partial name="_BlogNav" model="@("Dashboard")" />
+
+@if (Model.Analytics is { } analytics)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Posts</div><div class="fs-3">@analytics.TotalPosts</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Pages</div><div class="fs-3">@analytics.TotalPages</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Drafts</div><div class="fs-3">@analytics.TotalDrafts</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Total views</div><div class="fs-3">@analytics.TotalViews</div></div></div></div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Views of the latest posts</h5>
+                <form method="get" class="d-flex align-items-center gap-2">
+                    <label for="Latest" class="text-muted small">Show</label>
+                    <select asp-for="Latest" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                        @foreach (var option in IndexModel.LatestOptions)
+                        {
+                            <option value="@option">Latest @option posts</option>
+                        }
+                    </select>
+                </form>
+            </div>
+
+            @if (analytics.LatestPostViews.Count == 0)
+            {
+                <p class="text-muted mb-0">No published posts yet.</p>
+            }
+            else
+            {
+                <canvas id="latestViewsChart" height="110"></canvas>
+                <script type="application/json" id="latestViewsData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    labels = analytics.LatestPostViews.Select(p => p.Title),
+                    data = analytics.LatestPostViews.Select(p => p.Views)
+                }))</script>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var dataElement = document.getElementById('latestViewsData');
+            var canvas = document.getElementById('latestViewsChart');
+            if (!dataElement || !canvas || typeof Chart === 'undefined') {
+                return;
+            }
+
+            var chartData = JSON.parse(dataElement.textContent);
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{ label: 'Views', data: chartData.data, backgroundColor: '#622aff' }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#aaa', callback: function (v) { var l = this.getLabelForValue(v); return l.length > 24 ? l.substring(0, 22) + '…' : l; } } },
+                        y: { beginAtZero: true, ticks: { color: '#aaa', precision: 0 } }
+                    }
+                }
+            });
+        });
+    </script>
+}

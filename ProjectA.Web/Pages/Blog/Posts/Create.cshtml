@@ -1,0 +1,13 @@
+@page
+@model ProjectA.Web.Pages.Blog.Posts.CreateModel
+@{
+    ViewData["Title"] = Model.IsPage ? "New blog page" : "New blog post";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<partial name="_PostForm" model="Model" />
+
+@section Scripts {
+    <partial name="_BlogEditorScripts" />
+}

@@ -1,0 +1,34 @@
+@page "{id:long}"
+@model ProjectA.Web.Pages.Blog.Posts.EditModel
+@{
+    ViewData["Title"] = Model.IsPage ? "Edit blog page" : "Edit blog post";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>@ViewData["Title"]</h1>
+    <div>
+        <a asp-page="Preview" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Preview</a>
+        @if (Model.PublicUrl is not null)
+        {
+            <a href="@Model.PublicUrl" target="_blank" rel="noopener" class="btn btn-outline-light">View on blog</a>
+        }
+    </div>
+</div>
+
+@if (Model.Existing is { } existing)
+{
+    <p class="text-muted small">
+        @(existing.PublishedAt is { } published ? $"Published {published.ToLocalTime():d MMM yyyy HH:mm}" : "Draft")
+        · @existing.PostViews views
+        @if (!string.IsNullOrWhiteSpace(existing.AuthorName))
+        {
+            <text>· by @existing.AuthorName</text>
+        }
+    </p>
+}
+
+<partial name="_PostForm" model="Model" />
+
+@section Scripts {
+    <partial name="_BlogEditorScripts" />
+}
