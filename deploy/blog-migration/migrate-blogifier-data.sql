@@ -2,27 +2,15 @@
 -- One-off copy of the existing Blogifier blog (darrentuer.net) into ProjectA's blog_* tables.
 --
 -- Run against the *ProjectA* database, after ProjectA.Api has started at least once (so DbUp
--- has applied script014-CreateTables-Blog.sql). Reads the Blogifier database over dblink:
+-- has applied script014-CreateTables-Blog.sql). Blogifier's tables ("Blogs", "Posts",
+-- "Categories", "PostCategories", "Authors") must be in that same database - they are read
+-- directly, no dblink or second connection:
 --
---   read -rs BLOGIFIER_PASSWORD && export BLOGIFIER_PASSWORD     # prompt; keeps it out of history
 --   psql "<ProjectA connection string>" \
---     -v source_host=<blogifier-rds-host> -v source_db=<blogifier-db> -v source_user=<user> \
 --     -v author_username="<ProjectA username that becomes the author of every migrated post>" \
 --     -f migrate-blogifier-data.sql
---   unset BLOGIFIER_PASSWORD
 --
--- Needs psql 15+ (\getenv). The Blogifier password is read from the BLOGIFIER_PASSWORD
--- environment variable - never put on the command line - and is only ever sent to the server in
--- one CREATE USER MAPPING statement inside the migration transaction. The mapping (and the
--- foreign server) are dropped before COMMIT, and a failed run rolls them back, so the password
--- is never left stored in the database and never appears in the dblink queries (which would
--- otherwise copy it into pg_stat_activity and any error-log STATEMENT lines). If the server
--- logs DDL (log_statement = ddl/all), turn that off for the run or the mapping will be logged.
---
--- The ProjectA database server must be able to reach the Blogifier database (same RDS
--- instance, or a security group rule allowing the ProjectA RDS instance to connect out to it).
--- On RDS the dblink extension is available; creating it needs rds_superuser (the master user).
--- If this script had to create the extension, it drops it again at the end.
+-- Optional: -v source_schema=<schema> if the Blogifier tables aren't in "public".
 --
 -- Safe to re-run: categories are matched by (case-insensitive) title and posts by slug, so
 -- anything already copied is skipped rather than duplicated. Blog settings and the author's
@@ -34,39 +22,21 @@
 
 \set ON_ERROR_STOP on
 
-\getenv source_password BLOGIFIER_PASSWORD
-\if :{?source_password}
+\if :{?author_username}
 \else
-    \echo 'Set the BLOGIFIER_PASSWORD environment variable (see the header of this script).'
+    \echo 'Pass -v author_username=<ProjectA username> (see the header of this script).'
     \quit
 \endif
 
--- Optional: -v source_sslmode=... (defaults to require) and -v source_port=... (defaults to 5432).
-\if :{?source_sslmode}
+\if :{?source_schema}
 \else
-    \set source_sslmode require
+    \set source_schema public
 \endif
-\if :{?source_port}
-\else
-    \set source_port 5432
-\endif
-
-SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'dblink') AS created_dblink \gset
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS dblink;
-
--- Connection details for the dblink calls below, as a foreign server + user mapping, so the
--- password isn't embedded in every dblink() query. Both are dropped before COMMIT.
-CREATE SERVER blogmig_source FOREIGN DATA WRAPPER dblink_fdw
-    OPTIONS (host :'source_host', port :'source_port', dbname :'source_db', sslmode :'source_sslmode');
-CREATE USER MAPPING FOR CURRENT_USER SERVER blogmig_source
-    OPTIONS (user :'source_user', password :'source_password');
-\unset source_password
-\set source blogmig_source
-
 SELECT set_config('blogmig.author_username', :'author_username', true);
+SELECT set_config('blogmig.source_schema', :'source_schema', true);
 
 DO $$
 BEGIN
@@ -77,43 +47,48 @@ BEGIN
         RAISE EXCEPTION 'No ProjectA user named "%" - create it (Users page) or pass a different author_username.',
             current_setting('blogmig.author_username');
     END IF;
+    IF to_regclass(format('%I."Posts"', current_setting('blogmig.source_schema'))) IS NULL THEN
+        RAISE EXCEPTION 'No Blogifier "Posts" table in schema "%" of this database - pass -v source_schema=<schema>.',
+            current_setting('blogmig.source_schema');
+    END IF;
 END $$;
 
+-- Blogifier's tables are found through the search_path (this transaction only), so the queries
+-- below can name them unqualified whichever schema they live in.
+SELECT set_config('search_path', format('%I, public', :'source_schema'), true);
+
 -- ---------------------------------------------------------------------------------------------
--- 1. Pull the Blogifier tables into temp tables (one dblink round trip each).
+-- 1. Snapshot the Blogifier tables into temp tables (later steps clean them up in place).
 --    Blogifier stored "timestamp without time zone" values in UTC.
 -- ---------------------------------------------------------------------------------------------
 CREATE TEMP TABLE src_blog ON COMMIT DROP AS
-SELECT * FROM dblink(:'source', $q$
-    SELECT "Title", "Description", "IncludeFeatured", "ItemsPerPage", "Cover", "Logo", "HeaderScript", "FooterScript"
-    FROM "Blogs" ORDER BY "Id" LIMIT 1
-$q$) AS t(title varchar, description varchar, include_featured bool, items_per_page int,
-          cover varchar, logo varchar, header_script varchar, footer_script varchar);
+SELECT "Title"::varchar AS title, "Description"::varchar AS description,
+       "IncludeFeatured"::bool AS include_featured, "ItemsPerPage"::int AS items_per_page,
+       "Cover"::varchar AS cover, "Logo"::varchar AS logo,
+       "HeaderScript"::varchar AS header_script, "FooterScript"::varchar AS footer_script
+FROM "Blogs" ORDER BY "Id" LIMIT 1;
 
 CREATE TEMP TABLE src_authors ON COMMIT DROP AS
-SELECT * FROM dblink(:'source', $q$
-    SELECT a."Id", a."DisplayName", a."Bio", a."Avatar",
-           (SELECT COUNT(*) FROM "Posts" p WHERE p."AuthorId" = a."Id")::int
-    FROM "Authors" a
-$q$) AS t(id int, display_name varchar, bio varchar, avatar varchar, post_count int);
+SELECT a."Id"::int AS id, a."DisplayName"::varchar AS display_name, a."Bio"::varchar AS bio,
+       a."Avatar"::varchar AS avatar,
+       (SELECT COUNT(*) FROM "Posts" p WHERE p."AuthorId" = a."Id")::int AS post_count
+FROM "Authors" a;
 
 CREATE TEMP TABLE src_categories ON COMMIT DROP AS
-SELECT * FROM dblink(:'source', $q$
-    SELECT "Id", "Content", "Description", "DateCreated", "DateUpdated" FROM "Categories"
-$q$) AS t(id int, title varchar, description varchar, date_created timestamp, date_updated timestamp);
+SELECT "Id"::int AS id, "Content"::varchar AS title, "Description"::varchar AS description,
+       "DateCreated"::timestamp AS date_created, "DateUpdated"::timestamp AS date_updated
+FROM "Categories";
 
 CREATE TEMP TABLE src_posts ON COMMIT DROP AS
-SELECT * FROM dblink(:'source', $q$
-    SELECT "Id", "PostType", "Title", "Slug", "Description", "Content", "Cover", "PostViews",
-           "IsFeatured", "Published", "DateCreated", "DateUpdated"
-    FROM "Posts"
-$q$) AS t(id int, post_type int, title varchar, slug varchar, description varchar, content text, cover varchar,
-          post_views int, is_featured bool, published timestamp, date_created timestamp, date_updated timestamp);
+SELECT "Id"::int AS id, "PostType"::int AS post_type, "Title"::varchar AS title,
+       "Slug"::varchar AS slug, "Description"::varchar AS description, "Content"::text AS content,
+       "Cover"::varchar AS cover, "PostViews"::int AS post_views, "IsFeatured"::bool AS is_featured,
+       "Published"::timestamp AS published, "DateCreated"::timestamp AS date_created,
+       "DateUpdated"::timestamp AS date_updated
+FROM "Posts";
 
 CREATE TEMP TABLE src_post_categories ON COMMIT DROP AS
-SELECT * FROM dblink(:'source', $q$
-    SELECT "PostId", "CategoryId" FROM "PostCategories"
-$q$) AS t(post_id int, category_id int);
+SELECT "PostId"::int AS post_id, "CategoryId"::int AS category_id FROM "PostCategories";
 
 -- ---------------------------------------------------------------------------------------------
 -- 2. Site settings (single row) - theme/analytics display columns are dropped.
@@ -231,12 +206,4 @@ FROM (
 ) refs
 ORDER BY 1;
 
-DROP USER MAPPING FOR CURRENT_USER SERVER blogmig_source;
-DROP SERVER blogmig_source;
-
 COMMIT;
-
--- dblink was only needed for this run; leave it installed only if it already was.
-\if :created_dblink
-DROP EXTENSION IF EXISTS dblink;
-\endif

@@ -23,25 +23,19 @@ create one on the Users page. Blogifier's own logins are not migrated.
 ## 3. Copy the data
 
 Run [`migrate-blogifier-data.sql`](migrate-blogifier-data.sql) against the
-**ProjectA** database from somewhere that can reach it. The ProjectA database server
-itself must be able to reach the Blogifier database, because the script uses
-`dblink`:
+**ProjectA** database. Blogifier's tables (`"Blogs"`, `"Posts"`, `"Categories"`,
+`"PostCategories"`, `"Authors"`) already live in that same database, so the script
+reads them directly; there is no `dblink` and no second connection or password:
 
 ```sh
-read -rs BLOGIFIER_PASSWORD && export BLOGIFIER_PASSWORD   # prompts; nothing in shell history
-psql "host=<projecta-rds> dbname=<projecta-db> user=<master-user> sslmode=require" \
-  -v source_host=<blogifier-rds> -v source_db=<blogifier-db> -v source_user=<user> \
+psql "host=<projecta-rds> dbname=<projecta-db> user=<user> sslmode=require" \
   -v author_username="<projecta username>" \
   -f deploy/blog-migration/migrate-blogifier-data.sql
-unset BLOGIFIER_PASSWORD
 ```
 
-This needs psql 15 or later. The Blogifier password is read from the
-`BLOGIFIER_PASSWORD` environment variable, so it never appears on the command line.
-Inside the database it is held only in a temporary user mapping, which is dropped before
-the script commits (or rolled back if the script fails). If RDS is set to log DDL
-(`log_statement = ddl` or `all`), turn that off for the run, or the mapping statement
-will be logged with the password.
+If the Blogifier tables are in a schema other than `public`, add
+`-v source_schema=<schema>`. The Blogifier tables are only read, never changed or
+dropped.
 
 The script:
 
@@ -52,7 +46,6 @@ The script:
   the others at the end instead of failing.
 - Replaces commas in category titles with " - " ("Cloud, DevOps" becomes
   "Cloud - DevOps"), because ProjectA's editor takes categories as a comma-separated list.
-- Removes the `dblink` extension afterwards if it wasn't installed before the run.
 - Does not copy subscribers, newsletters or mail settings.
 - Ends by listing every `data/...` file path the migrated posts reference. Step 4
   needs these.
