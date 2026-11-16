@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.FileProviders;
 using ProjectA.Web.Common;
-using ProjectA.Web.Security;
 using ProjectA.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,22 +31,6 @@ builder.Services
         options.AccessDeniedPath = "/Account/Login";
         options.ExpireTimeSpan = TimeSpan.FromHours(12);
         options.SlidingExpiration = true;
-
-        // Anything under /Blog (the blog admin, which the public blog's login button leads to)
-        // signs in on the blog-styled /Blog/Login instead, so blog users never see ProjectA's
-        // login page. Same cookie, same accounts.
-        options.Events.OnRedirectToLogin = context =>
-        {
-            var redirectUri = context.RedirectUri;
-            if (BlogLoginPath.IsBlogArea(context.Request))
-            {
-                var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
-                redirectUri = context.Request.PathBase + BlogLoginPath.Path + QueryString.Create("ReturnUrl", returnUrl);
-            }
-
-            context.Response.Redirect(redirectUri);
-            return Task.CompletedTask;
-        };
     });
 
 builder.Services.AddAuthorization();

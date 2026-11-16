@@ -5,10 +5,9 @@ using ProjectA.Web.Models;
 
 namespace ProjectA.Web.Security;
 
-// Shared by both login pages (ProjectA's /Account/Login and the blog-styled /Blog/Login): turns
-// a successful POST /api/auth/login result into the auth cookie. The API token itself lives only
-// as a claim on this cookie's encrypted identity - there is no separate server-side session
-// store. BearerTokenHandler reads it back out of HttpContext.User on every outgoing API call.
+// Used by /Account/Login: turns a successful POST /api/auth/login result into the auth cookie.
+// The API token itself lives only as a claim on this cookie's encrypted identity - there is no
+// separate server-side session store. BearerTokenHandler reads it back out of HttpContext.User on every outgoing API call.
 public static class ApiCookieSignIn
 {
     public static Task SignInAsync(HttpContext httpContext, LoginResult login)
@@ -31,7 +30,7 @@ public static class ApiCookieSignIn
             });
     }
 
-    // The message both login pages show when the API refuses the login.
+    // The message the login page shows when the API refuses the login.
     public static string FailureMessage<T>(Common.ApiResult<T> result) =>
         result.StatusCode == StatusCodes.Status401Unauthorized
             ? "Incorrect username or password."

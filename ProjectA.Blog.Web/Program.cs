@@ -99,11 +99,6 @@ app.UseOutputCache();
 
 app.MapRazorPages();
 
-// Blogifier's admin and login lived under /admin on this site; they now live in ProjectA.Web.
-// Old bookmarks (and the theme's login icon) are sent there instead of 404ing.
-var adminUrl = app.Configuration["BlogSite:AdminUrl"];
-app.MapGet("/admin/{**rest}", () => string.IsNullOrWhiteSpace(adminUrl) ? Results.NotFound() : Results.Redirect(adminUrl));
-
 // RSS 2.0 feed at Blogifier's address (/feed/rss) - kept so existing subscribers keep working.
 // Only "rss" exists; any other {type} is a 404 rather than another separately cached copy.
 app.MapGet("/feed/{type:regex(^rss$)}", async (HttpContext context, IBlogApiClient api, CancellationToken cancellationToken) =>

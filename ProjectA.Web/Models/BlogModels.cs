@@ -193,13 +193,6 @@ public sealed class BlogPostViewsDto
     public DateTime PublishedAt { get; set; }
 }
 
-// GET /api/blog/site (anonymous) - only the fields the admin app uses.
-public sealed class BlogSiteDto
-{
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-}
-
 // GET /api/blog/analytics/daily - views per UTC day for one post/page (PostId) or the whole blog.
 public sealed class BlogDailyViewsDto
 {

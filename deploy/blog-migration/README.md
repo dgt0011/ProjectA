@@ -108,4 +108,3 @@ downloading each `https://www.darrentuer.net/data/...` URL before the cutover.
 | `/search?term=` | search (the old search form POSTed to `/Home/Search`) |
 | `/feed/rss`, `/sitemap` | unchanged |
 | `/data/...` | uploaded files, unchanged |
-| `/admin/**` | redirects to `BlogSite:AdminUrl` (the ProjectA Blog admin) |
