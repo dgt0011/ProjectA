@@ -1,0 +1,24 @@
+---
+
+# Where deploy-blog-web-projecta.yml publishes ProjectA.Blog.Web (the public blog,
+# formerly the Blogifier site on ECS) to - alongside web/ and api/ on the EFS mount.
+blogweb_dir: /mnt/data/blog
+
+# Self-contained apphost executable name (dotnet publish -r linux-x64 --self-contained).
+blogweb_executable: ProjectA.Blog.Web
+
+# Kestrel port - must match the blog nginx vhost's nginx_upstream_port in
+# projects-darrentuerrnet.yml and ProjectA.Blog.Web/Properties/launchSettings.json.
+blogweb_port: 5240
+
+# Shared blog uploads folder (Blogifier's old wwwroot/data). ProjectA.Blog.Web serves it at
+# /data and ProjectA.Web's Blog admin writes uploads into it - both apps' appsettings.Production.json
+# point BlogStorage:RootPath here.
+blog_storage_dir: /mnt/data/blog-storage
+
+# Unprivileged system account the public blog runs as. It is the one service on the host that
+# takes anonymous internet traffic, so unlike web/api it does not run as admin_user (which has
+# passwordless sudo and owns every app's binaries). It only needs to read: blogweb_dir and
+# blog_storage_dir stay owned by admin_user (deploys and admin uploads write there) and are
+# world-readable.
+blogweb_user: projecta-blog

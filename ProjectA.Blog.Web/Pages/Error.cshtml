@@ -1,0 +1,9 @@
+@page "/error"
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.IsNotFound ? "Page Not Found" : "Error";
+}
+
+<main class="container">
+    <h1>@(Model.IsNotFound ? "Page Not Found" : "Something went wrong")</h1>
+</main>

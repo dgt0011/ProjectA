@@ -1,0 +1,237 @@
+@page
+@model ProjectA.Web.Pages.Blog.IndexModel
+@{
+    ViewData["Title"] = "Blog";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Blog</h1>
+    @if (!string.IsNullOrWhiteSpace(Model.BlogSiteUrl))
+    {
+        <a href="@Model.BlogSiteUrl" target="_blank" rel="noopener" class="btn btn-outline-light">View blog</a>
+    }
+</div>
+
+<partial name="_BlogNav" model="@("Dashboard")" />
+
+@if (Model.Analytics is { } analytics)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Posts</div><div class="fs-3">@analytics.TotalPosts</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Pages</div><div class="fs-3">@analytics.TotalPages</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Drafts</div><div class="fs-3">@analytics.TotalDrafts</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-muted">Total views</div><div class="fs-3">@analytics.TotalViews</div></div></div></div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Views of the latest posts</h5>
+                <form method="get" class="d-flex align-items-center gap-2">
+                    <input type="hidden" name="Days" value="@Model.Days" />
+                    @if (Model.PostId is { } selectedPostId)
+                    {
+                        <input type="hidden" name="PostId" value="@selectedPostId" />
+                    }
+                    <label for="Latest" class="text-muted small">Show</label>
+                    <select asp-for="Latest" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                        @foreach (var option in IndexModel.LatestOptions)
+                        {
+                            <option value="@option">Latest @option posts</option>
+                        }
+                    </select>
+                </form>
+            </div>
+
+            @if (analytics.LatestPostViews.Count == 0)
+            {
+                <p class="text-muted mb-0">No published posts yet.</p>
+            }
+            else
+            {
+                <canvas id="latestViewsChart" height="110"></canvas>
+                <script type="application/json" id="latestViewsData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    labels = analytics.LatestPostViews.Select(p => p.Title),
+                    data = analytics.LatestPostViews.Select(p => p.Views)
+                }))</script>
+            }
+        </div>
+    </div>
+}
+
+@if (Model.DailyViews is { } daily)
+{
+    <div class="card" id="daily-views">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="card-title mb-0">Views by day <span class="text-muted small">(UTC)</span></h5>
+                <form method="get" action="#daily-views" class="d-flex flex-wrap align-items-center gap-2">
+                    <input type="hidden" name="Latest" value="@Model.Latest" />
+                    <select name="PostId" class="form-select form-select-sm w-auto" aria-label="Post or page" onchange="this.form.submit()">
+                        <option value="" selected="@(Model.PostId is null)">All posts and pages</option>
+                        @foreach (var post in daily.Posts)
+                        {
+                            <option value="@post.Id" selected="@(post.Id == Model.PostId)">
+                                @(post.PostType == BlogPostType.Page ? "Page: " : "")@post.Title (@post.Views)
+                            </option>
+                        }
+                    </select>
+                    <select asp-for="Days" class="form-select form-select-sm w-auto" aria-label="Period" onchange="this.form.submit()">
+                        @foreach (var option in IndexModel.DaysOptions)
+                        {
+                            <option value="@option">Last @option days</option>
+                        }
+                    </select>
+                </form>
+            </div>
+
+            <p class="text-muted small">
+                @Model.DailyViewsLabel: @daily.TotalViews view@(daily.TotalViews == 1 ? "" : "s")
+                from @daily.From.ToString("d MMM yyyy") to @daily.To.ToString("d MMM yyyy") (UTC days).
+                Click a day to see the IP addresses and user agents behind its views.
+            </p>
+            <canvas id="dailyViewsChart" height="110"></canvas>
+            <script type="application/json" id="dailyViewsData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                days = daily.Days.Select(d => d.Day.ToString("yyyy-MM-dd")),
+                labels = daily.Days.Select(d => d.Day.ToString("ddd d MMM")),
+                data = daily.Days.Select(d => d.Views),
+                postId = Model.PostId,
+                visitorsUrl = Url.Page("/Blog/Index", "Visitors")
+            }))</script>
+        </div>
+    </div>
+
+    <div class="modal fade" id="visitorsModal" tabindex="-1" aria-labelledby="visitorsModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="visitorsModalTitle">Visitors</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="visitorsModalBody"></div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof Chart === 'undefined') {
+                return;
+            }
+
+            var truncateLabel = function (v) { var l = this.getLabelForValue(v); return l.length > 24 ? l.substring(0, 22) + '…' : l; };
+
+            var latestData = document.getElementById('latestViewsData');
+            var latestCanvas = document.getElementById('latestViewsChart');
+            if (latestData && latestCanvas) {
+                var chartData = JSON.parse(latestData.textContent);
+                new Chart(latestCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{ label: 'Views', data: chartData.data, backgroundColor: '#622aff' }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: '#aaa', callback: truncateLabel } },
+                            y: { beginAtZero: true, ticks: { color: '#aaa', precision: 0 } }
+                        }
+                    }
+                });
+            }
+
+            var dailyData = document.getElementById('dailyViewsData');
+            var dailyCanvas = document.getElementById('dailyViewsChart');
+            if (!dailyData || !dailyCanvas) {
+                return;
+            }
+
+            var daily = JSON.parse(dailyData.textContent);
+            var modalElement = document.getElementById('visitorsModal');
+            var modalTitle = document.getElementById('visitorsModalTitle');
+            var modalBody = document.getElementById('visitorsModalBody');
+            var modal = new bootstrap.Modal(modalElement);
+            var pending = null;
+
+            var showVisitors = function (index) {
+                var day = daily.days[index];
+                modalTitle.textContent = 'Visitors – ' + daily.labels[index] + ' (UTC)';
+                modalBody.innerHTML = '<div class="text-muted">Loading…</div>';
+                modal.show();
+
+                if (pending) {
+                    pending.abort();
+                }
+                pending = new AbortController();
+
+                var url = daily.visitorsUrl + (daily.visitorsUrl.indexOf('?') < 0 ? '?' : '&') +
+                    'day=' + encodeURIComponent(day) +
+                    (daily.postId ? '&postId=' + encodeURIComponent(daily.postId) : '');
+                fetch(url, { signal: pending.signal, headers: { 'X-Requested-With': 'fetch' } })
+                    .then(function (response) {
+                        // An expired sign-in redirects to the login page, which fetch follows
+                        // and reports as success - reload so the browser goes to sign in instead
+                        // of showing the login page inside the modal.
+                        if (response.redirected) {
+                            window.location.reload();
+                            throw new DOMException('Signed out', 'AbortError');
+                        }
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(function (html) { modalBody.innerHTML = html; })
+                    .catch(function (error) {
+                        if (error.name !== 'AbortError') {
+                            modalBody.innerHTML = '';
+                            var message = document.createElement('p');
+                            message.className = 'text-danger mb-0';
+                            message.textContent = 'Could not load visitors (' + error.message + ').';
+                            modalBody.appendChild(message);
+                        }
+                    });
+            };
+
+            new Chart(dailyCanvas, {
+                type: 'bar',
+                data: {
+                    labels: daily.labels,
+                    datasets: [{ label: 'Views', data: daily.data, backgroundColor: '#1fb6ff' }]
+                },
+                options: {
+                    // Hovering anywhere in a day's column (not just on the bar) selects it, so days
+                    // with few or no views are still clickable.
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function (items) { return items.length ? items[0].label + ' (UTC)' : ''; },
+                                footer: function () { return 'Click for visitors'; }
+                            }
+                        }
+                    },
+                    onHover: function (event, elements) {
+                        event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                    },
+                    onClick: function (event, elements) {
+                        if (elements.length) {
+                            showVisitors(elements[0].index);
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#aaa', autoSkip: true, maxRotation: 0 } },
+                        y: { beginAtZero: true, ticks: { color: '#aaa', precision: 0 } }
+                    }
+                }
+            });
+        });
+    </script>
+}

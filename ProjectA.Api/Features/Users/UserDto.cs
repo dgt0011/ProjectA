@@ -13,6 +13,10 @@ internal sealed class UserDto
     public long id { get; init; }
     public string username { get; set; } = string.Empty;
     public string password_hash { get; set; } = string.Empty;
+    // Public blog author profile (script014) - shown on posts this user writes.
+    public string? display_name { get; set; }
+    public string? bio { get; set; }
+    public string? avatar { get; set; }
     public DateTime date_created { get; init; }
     public DateTime? date_modified { get; set; }
 }

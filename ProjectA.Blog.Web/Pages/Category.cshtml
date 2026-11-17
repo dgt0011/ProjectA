@@ -1,0 +1,11 @@
+@page "/categories/{category}"
+@model CategoryModel
+@{
+    ViewData["Title"] = Model.Category;
+    ViewData["Canonical"] = $"/categories/{Uri.EscapeDataString(Model.Category)}";
+}
+
+<main class="container">
+    <h1 class="h3 mb-5">categories: <strong>@Model.Category</strong></h1>
+    <partial name="_PostList" model="Model.List" />
+</main>

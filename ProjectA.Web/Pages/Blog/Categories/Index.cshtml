@@ -1,0 +1,68 @@
+@page
+@model ProjectA.Web.Pages.Blog.Categories.IndexModel
+@{
+    ViewData["Title"] = "Blog categories";
+}
+
+<h1>Blog</h1>
+
+<partial name="_BlogNav" model="@("Categories")" />
+
+<p class="text-muted">
+    Blog categories are public (they appear in the blog's category menu and at <code>/categories/{name}</code>)
+    and are separate from ProjectA's own note/bookmark categories.
+</p>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+<form method="post" class="row g-2 align-items-start mb-4">
+    <div class="col-md-4">
+        <input asp-for="Form.Title" class="form-control" placeholder="New category name" />
+        <span asp-validation-for="Form.Title" class="text-danger"></span>
+    </div>
+    <div class="col-md-6">
+        <input asp-for="Form.Description" class="form-control" placeholder="Description (optional)" />
+        <span asp-validation-for="Form.Description" class="text-danger"></span>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Add</button>
+    </div>
+</form>
+
+@if (!Model.LoadedSuccessfully)
+{
+    <div class="alert alert-warning">Could not load blog categories from the API.</div>
+}
+else if (Model.Categories.Count == 0)
+{
+    <p class="text-muted">No blog categories yet.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th class="text-end">Posts</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var category in Model.Categories)
+            {
+                <tr>
+                    <td>@category.Title</td>
+                    <td>@category.Description</td>
+                    <td class="text-end">@category.PostCount</td>
+                    <td class="text-end text-nowrap">
+                        <a asp-page="Edit" asp-route-id="@category.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" asp-page-handler="Delete" asp-route-id="@category.Id" class="d-inline"
+                              onsubmit="return confirm('Delete this category? Posts using it keep everything else.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

@@ -5,6 +5,10 @@
 # roles stay in sync.
 nginx_server_name: projects.darrentuer.net
 
+# Additional hostnames served by the same vhost (and included on the certificate by the
+# letsencrypt role) - e.g. the bare darrentuer.net alongside www.darrentuer.net for the blog.
+nginx_server_aliases: []
+
 # Where the ProjectA.Web app listens. Matches ProjectA.Web/Properties/launchSettings.json's
 # "http" profile (applicationUrl: http://localhost:5220).
 nginx_upstream_host: 127.0.0.1

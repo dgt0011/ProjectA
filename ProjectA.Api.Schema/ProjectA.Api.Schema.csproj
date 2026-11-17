@@ -39,6 +39,10 @@
       <EmbeddedResource Include="Scripts\script012-CreateTable-AttachmentTypes.sql" />
       <None Remove="Scripts\script013-AlterTable-Todos-Add-CompletionNotes.sql" />
       <EmbeddedResource Include="Scripts\script013-AlterTable-Todos-Add-CompletionNotes.sql" />
+      <None Remove="Scripts\script014-CreateTables-Blog.sql" />
+      <EmbeddedResource Include="Scripts\script014-CreateTables-Blog.sql" />
+      <None Remove="Scripts\script015-CreateTable-BlogPostViews.sql" />
+      <EmbeddedResource Include="Scripts\script015-CreateTable-BlogPostViews.sql" />
     </ItemGroup>
 
 </Project>

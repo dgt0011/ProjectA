@@ -1,0 +1,5 @@
+---
+
+# Needs /mnt/data mounted before defining a service that lives under it.
+dependencies:
+  - role: efs-mount

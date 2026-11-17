@@ -1,0 +1,68 @@
+@model PostListViewModel
+@*
+    Blogifier standard theme: post/featured.cshtml. The live site always renders this container
+    (even with no featured posts) and its bottom margin is part of the home page's spacing, so it
+    is rendered unconditionally here too.
+*@
+@{
+    var featured = Model.Page.Items.Where(p => p.IsFeatured).Take(3).ToList();
+}
+<div id="carouselFeatured" class="featured carousel slide carousel-dark" data-bs-ride="carousel" aria-label="Slideshow">
+    <div class="carousel-inner">
+        @for (var i = 0; i < featured.Count; i++)
+        {
+            var item = featured[i];
+            var url = BlogFormat.PostPath(item.PostType, item.Slug);
+            <div class="carousel-item @(i == 0 ? "active" : "")">
+                <article class="featured-item row">
+                    <section class="col-lg-7">
+                        <figure class="featured-cover" aria-hidden="true">
+                            <a href="@url" class="featured-cover-link" tabindex="-1">
+                                <img class="featured-cover-img" alt="@item.Title" src="@BlogFormat.AssetUrl(item.Cover, Model.DefaultCover)">
+                            </a>
+                            <figcaption class="visually-hidden">@item.Title</figcaption>
+                        </figure>
+                    </section>
+                    <section class="featured-content col-lg-5 my-auto">
+                        <h2 class="featured-title">
+                            <a class="featured-link" href="@url">@item.Title</a>
+                        </h2>
+                        <div class="featured-meta d-none d-md-flex">
+                            <div class="featured-date">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" class="bi bi-calendar-event featured-date-icon" viewBox="0 0 16 16">
+                                    <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z" />
+                                    <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                                </svg>
+                                <time class="featured-date-time">@BlogFormat.FriendlyDate(item.PublishedAt)</time>
+                            </div>
+                            @if (item.Categories.Count > 0)
+                            {
+                                <div class="featured-cat">
+                                    @foreach (var category in item.Categories)
+                                    {
+                                        <a class="featured-cat-title" href="/categories/@Uri.EscapeDataString(category.Title)" tabindex="-1">@category.Title</a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <p class="featured-desc">@item.Description</p>
+                        <a class="featured-more" href="@url">
+                            Read More
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z" />
+                            </svg>
+                        </a>
+                    </section>
+                </article>
+            </div>
+        }
+    </div>
+    <button class="carousel-control-next featured-next d-none d-xl-block" type="button" data-bs-target="#carouselFeatured" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Next</span>
+    </button>
+    <button class="carousel-control-prev featured-prev d-none d-xl-block" type="button" data-bs-target="#carouselFeatured" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Previous</span>
+    </button>
+</div>

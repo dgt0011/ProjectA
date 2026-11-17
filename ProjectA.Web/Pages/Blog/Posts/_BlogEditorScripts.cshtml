@@ -1,0 +1,49 @@
+@* EasyMDE for the post body (same editor the Notes pages use), plus image upload: dropped or
+   pasted images are posted to /Blog/Upload (which saves them into blog storage) and inserted as
+   Markdown image links. The antiforgery token rides along as a form field so the Razor Page
+   handler's built-in validation accepts it. *@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var tokens = Antiforgery.GetAndStoreTokens(Context);
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var textarea = document.getElementById('Form_Content');
+        if (!textarea || typeof EasyMDE === 'undefined') {
+            return;
+        }
+
+        var easyMDE = new EasyMDE({
+            element: textarea,
+            spellChecker: false,
+            status: ['upload-image', 'lines', 'words'],
+            placeholder: 'Write the post in Markdown...',
+            uploadImage: true,
+            imageUploadEndpoint: '@Url.Page("/Blog/Upload")',
+            // Without this EasyMDE prefixes the returned "/data/..." path with this admin site's
+            // origin plus a "/" (https://projects...//data/...), which breaks on the public blog.
+            // The site-relative path is what the public blog serves.
+            imagePathAbsolute: true,
+            imageCSRFName: '@tokens.FormFieldName',
+            imageCSRFToken: '@tokens.RequestToken',
+            imageMaxSize: @ProjectA.Web.Common.BlogFileStorage.MaxFileBytes,
+            imageAccept: 'image/png, image/jpeg, image/gif, image/webp',
+            toolbar: [
+                'bold', 'italic', 'heading', '|',
+                'quote', 'code', 'unordered-list', 'ordered-list', 'table', '|',
+                'link', 'image', 'upload-image', '|',
+                'preview', 'side-by-side', 'fullscreen', '|',
+                'guide'
+            ]
+        });
+
+        var sync = function () { textarea.value = easyMDE.value(); };
+        easyMDE.codemirror.on('change', sync);
+        var form = textarea.closest('form');
+        if (form) {
+            form.addEventListener('submit', sync);
+        }
+    });
+</script>

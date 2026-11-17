@@ -1,0 +1,55 @@
+@model BlogDailyVisitorsDto
+@* Modal body for the dashboard's daily-views chart: one UTC day's views grouped by IP address
+   and user agent. Everything here is reader-supplied text, so it relies on Razor encoding. *@
+@{
+    var showPosts = Model.PostId is null;
+}
+<p class="text-muted">
+    @Model.TotalViews view@(Model.TotalViews == 1 ? "" : "s") on @Model.Day.ToString("ddd d MMM yyyy") (UTC)
+    from @Model.TotalVisitors distinct IP address / user agent combination@(Model.TotalVisitors == 1 ? "" : "s").
+    @if (Model.TotalVisitors > Model.Visitors.Count)
+    {
+        <span>Showing the @Model.Visitors.Count with the most views.</span>
+    }
+</p>
+@if (Model.Visitors.Count == 0)
+{
+    <p class="mb-0">No views recorded on this day.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>IP address</th>
+                    <th>User agent</th>
+                    @if (showPosts)
+                    {
+                        <th>Viewed</th>
+                    }
+                    <th class="text-end">Views</th>
+                    <th class="text-nowrap">Time (UTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var visitor in Model.Visitors)
+                {
+                    <tr>
+                        <td class="text-nowrap font-monospace">@(visitor.IpAddress ?? "unknown")</td>
+                        <td class="small text-break">@(visitor.UserAgent ?? "unknown")</td>
+                        @if (showPosts)
+                        {
+                            <td class="small">@visitor.Posts</td>
+                        }
+                        <td class="text-end">@visitor.Views</td>
+                        <td class="text-nowrap small">
+                            @visitor.FirstViewedAt.ToUniversalTime().ToString("HH:mm:ss")@if (visitor.Views > 1)
+                            {<text> – @visitor.LastViewedAt.ToUniversalTime().ToString("HH:mm:ss")</text>}
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

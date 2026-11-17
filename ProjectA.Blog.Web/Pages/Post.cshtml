@@ -1,0 +1,111 @@
+@page "/posts/{slug}"
+@model PostModel
+@using System.Text.Json
+@*
+    Blogifier standard theme: Post.cshtml / Page.cshtml (pages omit categories, previous/next
+    and related posts), matching the live site's markup.
+*@
+@{
+    var post = Model.Detail.Post;
+    ViewData["Title"] = post.Title;
+    ViewData["Description"] = post.Description;
+    ViewData["Canonical"] = BlogFormat.PostPath(post.PostType, post.Slug);
+}
+
+<main class="post-detail">
+    <article class="post">
+
+        <figure class="post-cover">
+            <img class="post-cover-img" src="@BlogFormat.AssetUrl(post.Cover, Model.DefaultCover)" alt="@post.Title" aria-hidden="true">
+        </figure>
+
+        <header class="post-header post-container">
+
+            <h1 class="post-title">@post.Title</h1>
+
+            <div class="post-meta d-flex align-items-center">
+                <div class="post-meta-item post-meta-date">
+                    <span class="post-meta-label">published</span>
+                    <time class="post-meta-date-time">@BlogFormat.FriendlyDate(post.PublishedAt)</time>
+                </div>
+                @if (!Model.IsPage && post.Categories.Count > 0)
+                {
+                    <div class="post-meta-item post-meta-cats">
+                        <span class="post-meta-label">categories</span>
+                        <ul class="post-meta-cats-list d-flex">
+                            @foreach (var category in post.Categories)
+                            {
+                                <li class="post-meta-cats-item">
+                                    <a class="post-meta-cats-link" href="/categories/@Uri.EscapeDataString(category.Title)">@category.Title</a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                <button class="post-meta-btn ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#shareModal" aria-label="share">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share" viewBox="0 0 16 16">
+                        <path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5zm-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <section class="post-content post-container">
+            @Html.Raw(Model.ContentHtml)
+        </section>
+
+    </article>
+
+    <div class="container">
+        @if (!Model.IsPage)
+        {
+            <nav class="post-nav">
+                <div class="d-none d-md-flex align-items-md-center">
+                    @if (Model.Detail.Older is { } older)
+                    {
+                        <div class="col">
+                            <a class="post-nav-item text-start" href="/posts/@older.Slug" aria-label="Previous post">
+                                <span class="post-nav-text">Previous post</span>
+                                <h4 class="post-nav-title">@older.Title</h4>
+                            </a>
+                        </div>
+                    }
+                    @if (Model.Detail.Newer is { } newer)
+                    {
+                        <div class="col">
+                            <a class="post-nav-item text-end" href="/posts/@newer.Slug" aria-label="Next post">
+                                <span class="post-nav-text">Next post</span>
+                                <h4 class="post-nav-title">@newer.Title</h4>
+                            </a>
+                        </div>
+                    }
+                </div>
+            </nav>
+
+            <partial name="_RelatedPosts" model="(Model.Detail.Related, Model.DefaultCover)" />
+        }
+
+        <partial name="_Share" model="(Model.AbsoluteUrl, post.Title)" />
+    </div>
+</main>
+
+@section JsonLd {
+    <script type="application/ld+json">
+    @Html.Raw(JsonSerializer.Serialize(new Dictionary<string, object?>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "NewsArticle",
+        ["headline"] = post.Title,
+        ["url"] = Model.AbsoluteUrl,
+        ["articleBody"] = post.Description,
+        ["image"] = Model.AbsoluteCoverUrl,
+        ["datePublished"] = post.PublishedAt.ToString("s"),
+        ["dateModified"] = post.PublishedAt.ToString("s"),
+        // Authors without a display name are credited to the blog itself (the API never exposes
+        // login usernames).
+        ["author"] = string.IsNullOrWhiteSpace(post.AuthorName)
+            ? new Dictionary<string, string> { ["@type"] = "Organization", ["name"] = Model.SiteTitle }
+            : new Dictionary<string, string> { ["@type"] = "Person", ["name"] = post.AuthorName }
+    }, new JsonSerializerOptions { WriteIndented = true }))
+    </script>
+}

@@ -4,5 +4,9 @@
 # server name so the two stay in sync without repeating the hostname.
 letsencrypt_domain: "{{ nginx_server_name }}"
 
+# Extra names on the same certificate. The certificate (and its /etc/letsencrypt/live/<dir>)
+# is still named after letsencrypt_domain.
+letsencrypt_extra_domains: "{{ nginx_server_aliases | default([]) }}"
+
 # Let's Encrypt requires a contact address for expiry/problem notices.
 letsencrypt_email: darren@tuers.io

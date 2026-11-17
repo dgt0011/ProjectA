@@ -1,0 +1,40 @@
+@page
+@model ProjectA.Web.Pages.Users.ProfileModel
+@{
+    ViewData["Title"] = "Author profile";
+}
+
+<h1>Blog</h1>
+
+<partial name="/Pages/Blog/_BlogNav.cshtml" model="@("Author profile")" />
+
+<p class="text-muted">
+    How <strong>@Model.Username</strong> appears as the author of blog posts. Leave the display name blank to show the username.
+</p>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form method="post" enctype="multipart/form-data" class="col-lg-8">
+    <div class="mb-3">
+        <label asp-for="Form.DisplayName" class="form-label"></label>
+        <input asp-for="Form.DisplayName" class="form-control" />
+        <span asp-validation-for="Form.DisplayName" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Bio" class="form-label"></label>
+        <textarea asp-for="Form.Bio" class="form-control" rows="4"></textarea>
+        <span asp-validation-for="Form.Bio" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Form.Avatar" class="form-label"></label>
+        <input asp-for="Form.Avatar" class="form-control mb-2" />
+        <input asp-for="AvatarFile" type="file" accept="image/*" class="form-control" />
+        <span asp-validation-for="AvatarFile" class="text-danger"></span>
+        @if (!string.IsNullOrWhiteSpace(Model.Form.Avatar))
+        {
+            <img src="@(Model.Form.Avatar.StartsWith("http") || Model.Form.Avatar.StartsWith("/") || Model.Form.Avatar.StartsWith("data:") ? Model.Form.Avatar : "/" + Model.Form.Avatar)"
+                 alt="Current avatar" class="rounded-circle mt-2" width="64" height="64" />
+        }
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>

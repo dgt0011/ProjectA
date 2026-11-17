@@ -12,6 +12,10 @@ public interface IUsersApiClient
     // Self-service - always changes whichever account the current bearer token (attached by
     // BearerTokenHandler) belongs to. There is no id parameter here on purpose.
     Task<ApiResult<ChangePasswordResult>> ChangePasswordAsync(ChangePasswordInput input, CancellationToken cancellationToken = default);
+
+    // Self-service, same as ChangePasswordAsync - the caller's own blog author profile.
+    Task<ApiResult<UserProfileDto>> GetProfileAsync(CancellationToken cancellationToken = default);
+    Task<ApiResult<UserProfileDto>> UpdateProfileAsync(UserProfileInput input, CancellationToken cancellationToken = default);
 }
 
 // Every /api/users route requires an authenticated caller (see UserEndpointsModule on the
@@ -31,4 +35,10 @@ public sealed class UsersApiClient(HttpClient httpClient) : ApiClientBase(httpCl
 
     public Task<ApiResult<ChangePasswordResult>> ChangePasswordAsync(ChangePasswordInput input, CancellationToken cancellationToken = default) =>
         PostJsonAsync<ChangePasswordInput, ChangePasswordResult>($"{BasePath}/change-password", input, cancellationToken);
+
+    public Task<ApiResult<UserProfileDto>> GetProfileAsync(CancellationToken cancellationToken = default) =>
+        GetJsonAsync<UserProfileDto>($"{BasePath}/profile", cancellationToken);
+
+    public Task<ApiResult<UserProfileDto>> UpdateProfileAsync(UserProfileInput input, CancellationToken cancellationToken = default) =>
+        PutJsonAsync<UserProfileInput, UserProfileDto>($"{BasePath}/profile", input, cancellationToken);
 }
