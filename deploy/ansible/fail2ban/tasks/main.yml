@@ -6,7 +6,7 @@
       - fail2ban
     state: latest
     update_cache: yes
-    lock_timeout: 300s
+    lock_timeout: 300
 
 - name: Create jail config
   copy:
