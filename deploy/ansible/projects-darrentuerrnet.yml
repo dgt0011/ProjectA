@@ -15,10 +15,11 @@
     # darrentuer.net / www.darrentuer.net DNS records point at this instance, otherwise
     # certbot's HTTP-01 challenge fails (and fails the play).
     blog_site_enabled: true
-    blog_tls_enabled: false
+    blog_tls_enabled: true
     blog_server_name: www.darrentuer.net
     blog_server_aliases:
       - darrentuer.net
+      - blog.darrentuer.net
 
   roles:
     - core

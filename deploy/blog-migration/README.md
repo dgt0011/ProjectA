@@ -22,20 +22,21 @@ create one on the Users page. Blogifier's own logins are not migrated.
 
 ## 3. Copy the data
 
-Run [`migrate-blogifier-data.sql`](migrate-blogifier-data.sql) against the
-**ProjectA** database. Blogifier's tables (`"Blogs"`, `"Posts"`, `"Categories"`,
+Run [`migrate-blogifier-data.sql`](migrate-blogifier-data.sql) in DBeaver against
+the **ProjectA** database. Blogifier's tables (`"Blogs"`, `"Posts"`, `"Categories"`,
 `"PostCategories"`, `"Authors"`) already live in that same database, so the script
-reads them directly; there is no `dblink` and no second connection or password:
+reads them directly. They are only read, never changed or dropped.
 
-```sh
-psql "host=<projecta-rds> dbname=<projecta-db> user=<user> sslmode=require" \
-  -v author_username="<projecta username>" \
-  -f deploy/blog-migration/migrate-blogifier-data.sql
-```
+1. Open the script in a SQL editor connected to the ProjectA database.
+2. At the top of the `DO` block, set `v_author_username` to the ProjectA username.
+   If the Blogifier tables aren't in the `public` schema, also set `v_source_schema`.
+3. Run the whole file with **Execute SQL Script** (Alt+X).
+4. Open the **Output** panel (Show server output, Ctrl+Shift+O) to see the summary.
+   The last query opens as a result tab listing the referenced `data/...` files.
 
-If the Blogifier tables are in a schema other than `public`, add
-`-v source_schema=<schema>`. The Blogifier tables are only read, never changed or
-dropped.
+The migration is a single `DO` block, so it runs in one transaction whatever the
+auto-commit setting is. If anything fails, nothing is changed. The script is plain
+SQL, so it also runs with `psql -f`.
 
 The script:
 
